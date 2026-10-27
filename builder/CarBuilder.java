@@ -3,12 +3,16 @@ import com.bmw.psdz.api.Logic;
 import com.bmw.psdz.api.ServiceLocator;
 import com.bmw.psdz.api.data.FA;
 import com.bmw.psdz.api.data.FP;
+import com.bmw.psdz.api.data.IStufe;
 import com.bmw.psdz.api.data.ProcessClass;
 import com.bmw.psdz.api.data.SGBMID;
+import com.bmw.psdz.api.data.SVT;
 import com.bmw.psdz.api.data.StandardSVK;
 import com.bmw.psdz.api.data.caf.NCD;
 import com.bmw.psdz.api.data.ecu.DiagAddress;
+import com.bmw.psdz.api.data.ecu.ECU;
 import com.bmw.psdz.api.data.ecu.ECUIdentifier;
+import com.bmw.psdz.api.data.svb.SollverbauungGenerateConfig;
 import java.io.File;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -106,6 +110,8 @@ public final class CarBuilder {
 
         FA fa = new FA();
         fa.parseXML(faXml.substring(faXml.indexOf("<ns2:fa>"), faXml.indexOf("</ns2:fa>") + 9).replace("ns2:", ""));
+        modules = target(logic, modules, fa, build, current, outdated);
+        write(new File(car, "modules.txt"), String.join("\n", modules) + "\n");
         FP fp = logic.generateFP(fa);
         write(new File(car, "FP.xml"), fp.getAsXML());
         write(new File(car, "vcm.txt"), "FA\t" + hex(fa.getAsStream()) + "\nFP\t" + hex(fp.getAsStream()) + "\n");
@@ -156,6 +162,54 @@ public final class CarBuilder {
         out.println("Coding: " + coded + " CAFDs coded for this order, " + defaults + " on default values");
         out.println("Done: " + car);
         System.exit(0);
+    }
+
+    /**
+     * The software E-Sys's own KIS calculation (complete flash, built at the shipment I-step, target the current one) wants
+     * on every module, so a car that is up to date has nothing to flash. OUTDATED modules keep what they were built with.
+     * If PSdZ cannot work it out, the lines stay as they are.
+     */
+    static List<String> target(Logic logic, List<String> modules, FA fa, String build, String current, Set<Integer> outdated) {
+        try {
+            SVT ist = new SVT();
+            for (String line : modules) {
+                String[] p = line.split("\t");
+                ECU ecu = new ECU(new ECUIdentifier(new DiagAddress(Integer.parseInt(p[0], 16)), p[1].substring(0, p[1].indexOf('-'))));
+                ecu.setBNTNName(p[1]);
+                List<SGBMID> ids = new ArrayList<>();
+                for (String s : p[3].trim().split(" ")) ids.add(SGBMID.valueOf(s));
+                ecu.setSVK(new StandardSVK(ids.toArray(new SGBMID[0])));
+                ist.addECU(ecu);
+            }
+            SollverbauungGenerateConfig config = new SollverbauungGenerateConfig();
+            config.setFaultTolerance(true);
+            config.setIStufeShipment(IStufe.valueOf(build));
+            config.setIStufeSoll(IStufe.valueOf(current));
+            SVT soll = logic.generateSollverbauungGesamtflashWithMatcher(ist, fa, config).getSollverbauung().getSVT();
+            Map<Integer, List<SGBMID>> wanted = new HashMap<>();
+            for (ECU e : soll.getECUList()) if (e.getSVK() != null) wanted.put(e.getPrimaryDiagAddress().getOffsetAsInt(), e.getSVK().getSGBMIDs());
+            List<String> lines = new ArrayList<>();
+            int changed = 0;
+            for (String line : modules) {
+                String[] p = line.split("\t");
+                int addr = Integer.parseInt(p[0], 16);
+                List<SGBMID> ids = wanted.get(addr);
+                if (ids == null || ids.isEmpty() || outdated.contains(addr)) {
+                    lines.add(line);
+                    continue;
+                }
+                List<String> names = new ArrayList<>();
+                for (SGBMID id : ids) names.add(String.format("%s_%08X_%03d_%03d_%03d", id.getProcessClassAsString(), id.getIDAsLong(), id.getMainVersionAsInt(), id.getSubVersionAsInt(), id.getPatchVersionAsInt()));
+                String software = String.join(" ", names);
+                if (!new HashSet<>(names).equals(new HashSet<>(java.util.Arrays.asList(p[3].trim().split(" "))))) changed++;
+                lines.add(p[0] + "\t" + p[1] + "\t" + p[2] + "\t" + software);
+            }
+            out.println("Software: KIS target for " + current + " (" + changed + " modules adjusted)");
+            return lines;
+        } catch (Throwable e) {
+            out.println("Software: KIS target not available (" + String.valueOf(e.getMessage()).split("\\R")[0] + "), using the I-step lists");
+            return modules;
+        }
     }
 
     /** The order: type key, time criteria, SA codes and E/HO words, as written in FA.xml. */

@@ -13,8 +13,9 @@ Nothing here talks to a real car. Every VIN is made up.
 | BMW F10 550i xDrive M Sport (US, 2015) | `cars\F10_550i_xDrive_US` | 35 |
 | BMW F30 340i M Sport (US, 2017) | `cars\F30_340i_US` | 23 |
 | BMW F80 M3 (US, 2017) | `cars\F80_M3_US` | 24 |
+| BMW F30 340i with old cluster software (flash practice) | `cars\F30_340i_US_flashtest` | 23 |
 
-Each car is built on your own PC from your own PSdZData, the way the factory puts a car together: the modules its order gets, the software they carry at the current I-step, and the factory coding of every module for that order. So what E-Sys reads is what a real car with that order would answer.
+Each car is built on your own PC from your own PSdZData, the way the factory puts a car together: the modules its order gets, the software E-Sys's own KIS calculation wants on them at the current I-step, and the factory coding of every module for that order. So what E-Sys reads is what a real car with that order would answer, and a car that is up to date has nothing to flash.
 
 ## What you need
 
@@ -32,7 +33,9 @@ Each car is built on your own PC from your own PSdZData, the way the factory put
 
 Close the window to switch the car off. What you code stays coded the next time; tick **Start fresh** to go back to the factory coding.
 
-Tested with E-Sys 25.10. ISTA looks for cars the same way over the network, but it is not tested yet.
+To flash: **Comfort Mode > TAL-Calculating**, Read FA, Read SVT (ECU), pick **Complete flash**, set **I-Step (shipm.)** to the car's `ISTEP_SHIPMENT` from `car.txt`, Calculate, TAL calculation, Save, Execute. To write FA/FP: **VCM > Master**, Read, then right-click the FA and **Activate FA**, then Write.
+
+Tested with E-Sys 25.10: connecting, reading and writing FA, FP and I-steps, SVT, coding, and the flash TAL calculation. Running a full flash and the FSC actions inside E-Sys is not tested yet. ISTA looks for cars the same way over the network, but it is not tested yet.
 
 ## Your own car model
 

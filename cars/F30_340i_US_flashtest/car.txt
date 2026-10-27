@@ -1,6 +1,6 @@
 # Fake Car settings (made-up VIN: valid check digit, not a real car)
 NAME=BMW F30 340i (flash test: old cluster software)
-VIN=WBADEMC52HK000340
+VIN=WBADEMC54HK000341
 ISTEP_SHIPMENT=F020-17-07-503
 ISTEP_LAST=F020-24-03-550
 ISTEP_CURRENT=F020-26-07-530

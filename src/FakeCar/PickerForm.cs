@@ -43,12 +43,16 @@ sealed class PickerForm : Form
         bottom.Controls.Add(status, 0, 1);
         bottom.SetColumnSpan(status, 2);
 
-        var title = new Label { Text = "Pick a car", Dock = DockStyle.Top, Height = 34, Padding = new Padding(12, 10, 0, 0), Font = new Font("Segoe UI Semibold", 11f) };
+        var title = new Label { Text = "Pick a car", Dock = DockStyle.Fill, Padding = new Padding(12, 10, 0, 0), Font = new Font("Segoe UI Semibold", 11f) };
+        var byline = new Label { Text = "by kdrcoding", Dock = DockStyle.Right, AutoSize = true, Padding = new Padding(0, 13, 14, 0), Font = new Font("Segoe UI", 8.5f), ForeColor = SystemColors.GrayText };
+        var header = new Panel { Dock = DockStyle.Top, Height = 34 };
+        header.Controls.Add(title);
+        header.Controls.Add(byline);
         var listHolder = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 4, 12, 0) };
         listHolder.Controls.Add(list);
         Controls.Add(listHolder);
         Controls.Add(bottom);
-        Controls.Add(title);
+        Controls.Add(header);
         AcceptButton = start;
         ShowState();
 
@@ -172,7 +176,7 @@ sealed class PickerForm : Form
         status.Text = $"Running: {runningModel.Name}. In E-Sys, Open Connection and pick the car by its VIN, or use the gateway URL tcp://127.0.0.1:6801.";
     }
 
-    public void TakePicture(string path)
+    public void TakePicture(string path, bool startCar)
     {
         StartPosition = FormStartPosition.Manual;
         Location = new Point(-6000, -6000);
@@ -180,6 +184,11 @@ sealed class PickerForm : Form
         Shown += async (_, _) =>
         {
             Save(Path.ChangeExtension(path, ".idle.png"));
+            if (!startCar)
+            {
+                Close();
+                return;
+            }
             list.SelectedIndex = list.Items.Count - 1;
             start.PerformClick();
             for (var i = 0; i < 180 && (building || runningModel is null) && !status.Text.StartsWith("Could not", StringComparison.Ordinal); i++) await Task.Delay(500);

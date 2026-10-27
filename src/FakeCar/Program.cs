@@ -26,14 +26,16 @@ static class Program
         if (!options.ContainsKey("car"))
         {
             ApplicationConfiguration.Initialize();
-            if (!createdNew)
+            var picture = options.GetValueOrDefault("picture");
+            if (!createdNew && picture is null)
             {
                 MessageBox.Show("Fake Car is already running.", "Fake Car", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return 2;
             }
             var form = new PickerForm(CarsFolder(), stopEvent);
             // --picture <png>: tests draw the window off-screen, start the last car, and save what it shows.
-            if (options.GetValueOrDefault("picture") is { } picture) form.TakePicture(picture);
+            // (With another Fake Car running, only the window is drawn: no car is started.)
+            if (picture is not null) form.TakePicture(picture, startCar: createdNew);
             Application.Run(form);
             return 0;
         }

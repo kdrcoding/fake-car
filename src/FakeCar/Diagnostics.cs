@@ -49,6 +49,12 @@ sealed class Diagnostics(Car car, Log log)
                 return Suppress(req[1], [0x68, (byte)(req[1] & 0x7F)]);
             case 0x31 when req.Length >= 4:
                 return Routine(ecu, req);
+            case 0x34 when req.Length >= 4:
+                return RequestDownload(ecu, req);
+            case 0x36 when req.Length >= 2:
+                return TransferData(ecu, req);
+            case 0x37:
+                return TransferExit(ecu);
             case 0x01 when req.Length >= 2 && ecu.Dids.TryGetValue(0xF442, out var volts):
                 // OBD mode 01, answered by the engine computer: 42 = module voltage (mV), 0C = engine speed (rpm x4).
                 return req[1] switch
@@ -106,7 +112,46 @@ sealed class Diagnostics(Car car, Log log)
         ecu.Dids[did] = req[3..];
         log.Line($"  WRITE {ecu.Name} [{ecu.Address:X2}] DID {did:X4} {req.Length - 3} bytes");
         car.Changed(ecu, did);
+        // Coding from another CAFD (version) carries that CAFD's ID: the SVK shows the CAFD now in the module.
+        if (ecu.TakeSoftware(req[3..])) SvkChanged(ecu);
         return [0x6E, req[1], req[2]];
+    }
+
+    // Flashing: RequestDownload, TransferData blocks, RequestTransferExit, like a module's flash loader.
+    const int MaxBlock = 0x0FFA;
+    const int Keep = 256 * 1024;
+
+    byte[] RequestDownload(Ecu ecu, byte[] req)
+    {
+        if (ecu.Session != 2) return [0x7F, 0x34, 0x22]; // conditions not correct: programming session first
+        ecu.Download = [];
+        ecu.DownloadBytes = 0;
+        log.Line($"  FLASH {ecu.Name} [{ecu.Address:X2}] download {Convert.ToHexString(req[1..])}");
+        // 0x20: the block length takes 2 bytes.
+        return [0x74, 0x20, MaxBlock >> 8, MaxBlock & 0xFF];
+    }
+
+    static byte[] TransferData(Ecu ecu, byte[] req)
+    {
+        if (ecu.Download is null) return [0x7F, 0x36, 0x24]; // request sequence error
+        ecu.DownloadBytes += req.Length - 2;
+        if (ecu.Download.Count < Keep) ecu.Download.AddRange(req.Skip(2).Take(Keep - ecu.Download.Count));
+        return [0x76, req[1]];
+    }
+
+    byte[] TransferExit(Ecu ecu)
+    {
+        if (ecu.Download is null) return [0x7F, 0x37, 0x24];
+        log.Line($"  FLASH {ecu.Name} [{ecu.Address:X2}] {ecu.DownloadBytes} bytes in");
+        if (ecu.TakeSoftware(ecu.Download)) SvkChanged(ecu);
+        ecu.Download = null;
+        return [0x77];
+    }
+
+    void SvkChanged(Ecu ecu)
+    {
+        car.Changed(ecu, 0xF101);
+        log.Line($"  SVK {ecu.Name} [{ecu.Address:X2}] now {Convert.ToHexString(ecu.Dids[0xF101])}");
     }
 
     static byte[] SecurityAccess(Ecu ecu, byte[] req)
@@ -126,6 +171,7 @@ sealed class Diagnostics(Car car, Log log)
     {
         var control = req[1];
         log.Line($"  ROUTINE {control:X2} {req[2]:X2}{req[3]:X2} {Convert.ToHexString(req[4..])} at {ecu.Name} [{ecu.Address:X2}]");
+        if (req[2] == 0x0F && req[3] == 0x1F && control == 0x01) return ecu.TakesFsc ? Swt(ecu, req) : [0x7F, 0x31, RequestOutOfRange];
         return control switch
         {
             0x01 => [0x71, 0x01, req[2], req[3], 0x00],
@@ -133,6 +179,57 @@ sealed class Diagnostics(Car car, Log log)
             0x03 => [0x71, 0x03, req[2], req[3], 0x00],
             _ => [0x7F, 0x31, SubFunctionNotSupported],
         };
+    }
+
+    // Enabling codes (SWT routine 0F1F, as BMW's SWT_UDS description has it): the byte after the routine number says
+    // what to do; most carry a software ID (application number 2 bytes, upgrade index 2 bytes). Answer: 71 01 0F 1F,
+    // the same sub-function, a result (00 = OK), then its data.
+    const byte SwtOk = 0x00, SwtInvalidFsc = 0xD1, SwtBadParam = 0xD6;
+
+    byte[] Swt(Ecu ecu, byte[] req)
+    {
+        if (req.Length < 5) return [0x7F, 0x31, IncorrectLength];
+        var what = req[4];
+        uint? swid = req.Length >= 9 ? (uint)(req[5] << 24 | req[6] << 16 | req[7] << 8 | req[8]) : null;
+        byte[] Ok(params byte[] data) => [0x71, 0x01, 0x0F, 0x1F, what, SwtOk, .. data];
+        byte[] Fail(byte result) => [0x71, 0x01, 0x0F, 0x1F, what, result];
+        switch (what)
+        {
+            case 0x04: // status: whole SWT status, then per code its software ID, signature status, status, type
+                {
+                    var list = new List<byte> { 0x02, 0x02, 0x02 };
+                    foreach (var id in ecu.Fscs.Keys) list.AddRange([(byte)(id >> 24), (byte)(id >> 16), (byte)(id >> 8), (byte)id, 0x02, 0x02, 0x02]);
+                    return Ok([.. list]);
+                }
+            case 0x07 when swid is { } id && req.Length > 9: // write a code
+                ecu.Fscs[id] = req[9..];
+                car.FscChanged(ecu, id);
+                log.Line($"  FSC {ecu.Name} [{ecu.Address:X2}] {id:X8} written ({req.Length - 9} bytes)");
+                return Ok();
+            case 0x0B when swid is { } id: // read a code
+                return ecu.Fscs.TryGetValue(id, out var fsc) ? Ok(fsc) : Fail(SwtInvalidFsc);
+            case 0x09 when swid is { } id: // check a code
+                return ecu.Fscs.ContainsKey(id) ? Ok() : Fail(SwtInvalidFsc);
+            case 0x0A when swid is { } id: // cancel (delete) a code
+                if (!ecu.Fscs.Remove(id)) return Fail(SwtInvalidFsc);
+                car.FscChanged(ecu, id);
+                log.Line($"  FSC {ecu.Name} [{ecu.Address:X2}] {id:X8} cancelled");
+                return Ok();
+            case 0x01: // software IDs this module has codes for
+                {
+                    var list = new List<byte> { ecu.Address };
+                    foreach (var id in ecu.Fscs.Keys) list.AddRange([(byte)(id >> 24), (byte)(id >> 16), (byte)(id >> 8), (byte)id]);
+                    return Ok([.. list]);
+                }
+            case 0x0E: // SWT version: specification document number (8), sub document (3), version (2), library version (4)
+                return Ok([.. "00000000"u8, .. "000"u8, .. "01"u8, 0x04, 0x00, 0x00, 0x00]);
+            case 0x0D: // module data for the enabling server
+                return Ok([.. car.VinBytes[^7..], ecu.Address]);
+            case 0x03 or 0x05 or 0x06 or 0x08 or 0x0C or 0x0F: // signatures and certificates: accepted
+                return Ok();
+            default:
+                return Fail(SwtBadParam);
+        }
     }
 
     static byte[] ReadFaults(Ecu ecu, byte[] req)

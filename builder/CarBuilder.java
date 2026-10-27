@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
 /**
  * Builds a Fake Car folder from your own E-Sys and PSdZData, with no car and no window.
  *
- * <p>In: car.txt (ISTEP_SHIPMENT, ISTEP_CURRENT) and FA.xml (the vehicle order). Out: modules.txt, FP.xml, vcm.txt,
+ * <p>In: car.txt (ISTEP_SHIPMENT, ISTEP_CURRENT, optional OUTDATED module addresses) and FA.xml (the vehicle order). Out: modules.txt, FP.xml, vcm.txt,
  * svk.txt, NCD\ and NCD_default\.
  *
  * <ol>
@@ -80,7 +80,10 @@ public final class CarBuilder {
         String series = current.substring(0, 4);
 
         out.println("Car: " + settings.getOrDefault("NAME", car.getName()) + " (type " + order.type + ", built " + build + ", now " + current + ")");
-        List<String> modules = kis(new File(data, "psdzdata\\kiswb\\" + series), order, build, current);
+        // OUTDATED=60,63: these modules keep the software they were built with, so E-Sys has something to flash.
+        Set<Integer> outdated = new HashSet<>();
+        for (String a1 : settings.getOrDefault("OUTDATED", "").split(",")) if (!a1.trim().isEmpty()) outdated.add(Integer.parseInt(a1.trim(), 16));
+        List<String> modules = kis(new File(data, "psdzdata\\kiswb\\" + series), order, build, current, outdated);
         write(new File(car, "modules.txt"), String.join("\n", modules) + "\n");
         out.println("Modules: " + modules.size());
 
@@ -174,7 +177,7 @@ public final class CarBuilder {
         }
     }
 
-    static List<String> kis(File kisFolder, Order order, String build, String current) throws Exception {
+    static List<String> kis(File kisFolder, Order order, String build, String current, Set<Integer> outdated) throws Exception {
         // HSQLDB writes next to its files even read-only: work on a copy.
         Path copy = Files.createTempDirectory("fakecar-kis");
         File[] files = kisFolder.listFiles((d, n) -> n.startsWith("KIS."));
@@ -207,7 +210,7 @@ public final class CarBuilder {
                 parts.put(r.getInt(2), new String[] {bntn, r.getString(3)});
             }
             for (Map.Entry<Integer, String[]> e : parts.entrySet()) {
-                String line = software(c, e.getKey(), e.getValue()[0], e.getValue()[1], now);
+                String line = software(c, e.getKey(), e.getValue()[0], e.getValue()[1], outdated.contains(e.getKey()) ? built : now);
                 if (line != null) lines.add(line);
             }
         } finally {

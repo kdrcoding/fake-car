@@ -18,6 +18,42 @@ sealed class Ecu
     public List<Fault> Faults { get; } = [];
     public byte Session { get; set; } = 1;
     public bool Unlocked { get; set; }
+
+    /// <summary>The start of the software being flashed now (enough to find its SGBMID), and how much came in.</summary>
+    public List<byte>? Download { get; set; }
+
+    /// <summary>Enabling codes (FSC) by software ID (application number, upgrade index), as the module keeps them.</summary>
+    public SortedDictionary<uint, byte[]> Fscs { get; } = [];
+
+    /// <summary>Modules that take enabling codes on F-series: the head unit and the instrument cluster.</summary>
+    public bool TakesFsc => Name.StartsWith("HU", StringComparison.Ordinal) || Name.EndsWith("KOMBI", StringComparison.Ordinal);
+    public long DownloadBytes { get; set; }
+
+    /// <summary>
+    /// The SVK (22 F101) follows what is put into the module: a flashed software unit or a coded CAFD carries its own
+    /// SGBMID (process class, number, version), like the header a real module reads its SVK from. An entry with the same
+    /// process class and number takes the new version. True when the SVK changed.
+    /// </summary>
+    public bool TakeSoftware(IReadOnlyList<byte> data)
+    {
+        if (!Dids.TryGetValue(0xF101, out var svk) || svk.Length < 16) return false;
+        for (var e = 8; e + 8 <= svk.Length; e += 8)
+        {
+            for (var i = 0; i + 8 <= data.Count; i++)
+            {
+                if (data[i] != svk[e] || data[i + 1] != svk[e + 1] || data[i + 2] != svk[e + 2] || data[i + 3] != svk[e + 3] || data[i + 4] != svk[e + 4]) continue;
+                // A version (not erased flash) that differs from the one installed.
+                if (data[i + 5] == 0xFF || (data[i + 5] == svk[e + 5] && data[i + 6] == svk[e + 6] && data[i + 7] == svk[e + 7])) continue;
+                var changed = (byte[])svk.Clone();
+                changed[e + 5] = data[i + 5];
+                changed[e + 6] = data[i + 6];
+                changed[e + 7] = data[i + 7];
+                Dids[0xF101] = changed;
+                return true;
+            }
+        }
+        return false;
+    }
 }
 
 /// <summary>A stored fault: 3-byte code, status byte, and how often it happened.</summary>
@@ -27,6 +63,7 @@ sealed record Fault(int Code, byte Status, byte Count, int Mileage);
 sealed class Car
 {
     public required string Vin { get; init; }
+    public byte[] VinBytes => System.Text.Encoding.ASCII.GetBytes(Vin);
     public required string Folder { get; init; }
     public Dictionary<byte, Ecu> Ecus { get; } = [];
     public byte Gateway => 0x10;
@@ -105,9 +142,23 @@ sealed class Car
         File.WriteAllText(Path.Combine(WrittenFolder, $"{ecu.Address:X2}_{did:X4}.hex"), Convert.ToHexString(ecu.Dids[did]));
     }
 
+    public void FscChanged(Ecu ecu, uint swid)
+    {
+        Directory.CreateDirectory(WrittenFolder);
+        var file = Path.Combine(WrittenFolder, $"{ecu.Address:X2}_FSC_{swid:X8}.hex");
+        if (ecu.Fscs.TryGetValue(swid, out var fsc)) File.WriteAllText(file, Convert.ToHexString(fsc));
+        else File.Delete(file);
+    }
+
     void LoadWritten()
     {
         if (!Directory.Exists(WrittenFolder)) return;
+        foreach (var file in Directory.GetFiles(WrittenFolder, "*_FSC_*.hex"))
+        {
+            var p = Path.GetFileNameWithoutExtension(file).Split('_');
+            if (p.Length == 3 && Ecus.TryGetValue(byte.Parse(p[0], NumberStyles.HexNumber, CultureInfo.InvariantCulture), out var withFsc))
+                withFsc.Fscs[uint.Parse(p[2], NumberStyles.HexNumber, CultureInfo.InvariantCulture)] = Convert.FromHexString(File.ReadAllText(file).Trim());
+        }
         foreach (var file in Directory.GetFiles(WrittenFolder, "*.hex"))
         {
             var p = Path.GetFileNameWithoutExtension(file).Split('_');

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<faList xmlns:ns2="http://bmw.com/2005/psdz.data.fa">
+    <id name="">
+        <comment></comment>
+        <ns2:fa>
+            <ns2:header vinLong="WBADEMC52HK000340" date="2026-10-26" time="12:00:00" createdBy=""/>
+            <ns2:standardFA series="F030" typeKey="8B33" timeCriteria="0717" colourCode="0A96" fabricCode="LCSW" faVersion="3">
+                <ns2:eCodes/>
+                <ns2:saCodes>
+                    <ns2:saCode>1CA</ns2:saCode>
+                    <ns2:saCode>1CB</ns2:saCode>
+                    <ns2:saCode>205</ns2:saCode>
+                    <ns2:saCode>2TB</ns2:saCode>
+                    <ns2:saCode>2VB</ns2:saCode>
+                    <ns2:saCode>302</ns2:saCode>
+                    <ns2:saCode>319</ns2:saCode>
+                    <ns2:saCode>322</ns2:saCode>
+                    <ns2:saCode>337</ns2:saCode>
+                    <ns2:saCode>3AG</ns2:saCode>
+                    <ns2:saCode>403</ns2:saCode>
+                    <ns2:saCode>423</ns2:saCode>
+                    <ns2:saCode>430</ns2:saCode>
+                    <ns2:saCode>431</ns2:saCode>
+                    <ns2:saCode>494</ns2:saCode>
+                    <ns2:saCode>508</ns2:saCode>
+                    <ns2:saCode>534</ns2:saCode>
+                    <ns2:saCode>544</ns2:saCode>
+                    <ns2:saCode>552</ns2:saCode>
+                    <ns2:saCode>5AC</ns2:saCode>
+                    <ns2:saCode>5AS</ns2:saCode>
+                    <ns2:saCode>5DF</ns2:saCode>
+                    <ns2:saCode>609</ns2:saCode>
+                    <ns2:saCode>655</ns2:saCode>
+                    <ns2:saCode>688</ns2:saCode>
+                    <ns2:saCode>6AC</ns2:saCode>
+                    <ns2:saCode>6AK</ns2:saCode>
+                    <ns2:saCode>6NS</ns2:saCode>
+                    <ns2:saCode>6WB</ns2:saCode>
+                    <ns2:saCode>710</ns2:saCode>
+                    <ns2:saCode>715</ns2:saCode>
+                    <ns2:saCode>760</ns2:saCode>
+                    <ns2:saCode>840</ns2:saCode>
+                    <ns2:saCode>8KL</ns2:saCode>
+                    <ns2:saCode>8TF</ns2:saCode>
+                    <ns2:saCode>925</ns2:saCode>
+                    <ns2:saCode>9AA</ns2:saCode>
+                </ns2:saCodes>
+                <ns2:hoCodes/>
+            </ns2:standardFA>
+        </ns2:fa>
+    </id>
+</faList>

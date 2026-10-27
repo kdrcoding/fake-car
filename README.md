@@ -1,6 +1,6 @@
 # Fake Car
 
-A pretend BMW on your network. E-Sys finds it, connects to it and works with it like a real car: read the vehicle order (FA), FP and I-steps, read the module list (SVT), read and write coding, read and clear fault memory, reset modules.
+A pretend BMW on your network. E-Sys finds it, connects to it and works with it like a real car: read the vehicle order (FA), FP and I-steps, read the module list (SVT), read and write coding, flash software, enabling codes (FSC), read and clear fault memory, reset modules.
 
 Use it to try E-Sys and your coding tools at your desk, to test a tool before it ever touches a real car, or to record a video without a car (and without showing a real VIN).
 
@@ -42,6 +42,19 @@ Copy a car folder and change two files:
 - `car.txt`: name, a made-up VIN with a valid check digit, the I-steps (`ISTEP_SHIPMENT` is when it was built), mileage, battery.
 
 `faults.txt` lists the faults it has stored (module address, fault code, status, count, km).
+
+To have something to flash, add `OUTDATED=60` (module addresses, comma separated) to `car.txt`: those modules keep the software they were built with, and E-Sys's TAL calculation brings them up to the current I-step.
+
+## What changes when you work on it
+
+Like a real car, the Fake Car keeps what you put into it:
+
+- Coding: every coded block is stored. Coding from a newer CAFD shows that CAFD in the module's SVK.
+- Flashing: the software you flash shows its new version in the module's SVK.
+- Vehicle order, FP and I-steps written to the VCM are stored too.
+- Enabling codes (FSC): the head unit and the instrument cluster take, list, check and cancel them.
+
+Tick **Start fresh** to go back to the car as built.
 
 Start it in `FakeCar.exe`; it is built on the first start. To build by hand:
 

@@ -1,0 +1,12 @@
+# Builds
+build/
+bin/
+obj/
+*.jar
+classes/
+
+# Car data is made on each PC from its own PSdZData: only the order (FA.xml), car.txt and faults.txt are shared.
+cars/*/*
+!cars/*/FA.xml
+!cars/*/car.txt
+!cars/*/faults.txt

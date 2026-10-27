@@ -1,0 +1,6 @@
+# addr	code	status	count	km   (real BMW fault codes; 09 = present now, 08 = stored)
+12	101410	08	2	47980
+12	11A031	08	1	46120
+29	480692	09	4	48290
+63	B7F80F	08	1	48105
+72	800E92	08	3	47980

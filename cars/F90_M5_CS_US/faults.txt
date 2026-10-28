@@ -1,0 +1,1 @@
+# addr	code	status	count	km   (real BMW fault codes; 09 = present now, 08 = stored)

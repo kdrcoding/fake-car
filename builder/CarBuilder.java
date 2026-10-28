@@ -204,7 +204,21 @@ public final class CarBuilder {
                 if (!new HashSet<>(names).equals(new HashSet<>(java.util.Arrays.asList(p[3].trim().split(" "))))) changed++;
                 lines.add(p[0] + "\t" + p[1] + "\t" + p[2] + "\t" + software);
             }
-            out.println("Software: KIS target for " + current + " (" + changed + " modules adjusted)");
+            // Modules the target has that the fitting conditions above missed (E-Sys would show them red as missing).
+            Set<Integer> have = new HashSet<>();
+            for (String line : lines) have.add(Integer.parseInt(line.split("\t")[0], 16));
+            int added = 0;
+            for (ECU e : soll.getECUList()) {
+                int addr = e.getPrimaryDiagAddress().getOffsetAsInt();
+                List<SGBMID> ids = wanted.get(addr);
+                if (have.contains(addr) || ids == null || ids.isEmpty() || e.getBNTNName() == null) continue;
+                List<String> names = new ArrayList<>();
+                for (SGBMID id : ids) names.add(String.format("%s_%08X_%03d_%03d_%03d", id.getProcessClassAsString(), id.getIDAsLong(), id.getMainVersionAsInt(), id.getSubVersionAsInt(), id.getPatchVersionAsInt()));
+                lines.add(String.format("%02X\t%s\t%s\t%s", addr, e.getBNTNName(), e.getBNTNName(), String.join(" ", names)));
+                added++;
+            }
+            lines.sort(java.util.Comparator.comparingInt(l -> Integer.parseInt(l.split("\t")[0], 16)));
+            out.println("Software: KIS target for " + current + " (" + changed + " modules adjusted" + (added > 0 ? ", " + added + " added" : "") + ")");
             return lines;
         } catch (Throwable e) {
             out.println("Software: KIS target not available (" + String.valueOf(e.getMessage()).split("\\R")[0] + "), using the I-step lists");
@@ -408,7 +422,9 @@ public final class CarBuilder {
             else if (key.equals("TYP_MONT_LAND")) have = "W_" + f.getOrDefault("MLAND", "");
             else have = f.get(ALIAS.getOrDefault(key, key));
             if (have == null) return false;
-            return want.endsWith("*") ? have.startsWith(want.substring(0, want.length() - 1)) : have.equals(want);
+            if (want.endsWith("*")) return have.startsWith(want.substring(0, want.length() - 1));
+            // Some values carry a prefix the type data leaves off (TYP_FZGZUSDIFF=FZD_02 against FZDIFF=02).
+            return have.equals(want) || want.endsWith("_" + have);
         }
 
         static String yymm(String mmyy) {

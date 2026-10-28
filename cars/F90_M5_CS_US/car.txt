@@ -1,0 +1,11 @@
+# Fake Car settings (made-up VIN: valid check digit, not a real car)
+NAME=BMW F90 M5 CS (US, 2021)
+VIN=WBADEMC52MK000090
+ISTEP_SHIPMENT=S15A-21-03-540
+ISTEP_LAST=S15A-26-03-540
+ISTEP_CURRENT=S15A-26-07-550
+KM=8420
+BATTERY_MV=12710
+BATTERY_AH=90
+# The instrument cluster keeps its factory software, so E-Sys has something to flash.
+OUTDATED=60

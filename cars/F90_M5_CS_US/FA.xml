@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<faList xmlns:ns2="http://bmw.com/2005/psdz.data.fa">
+    <id name="">
+        <comment></comment>
+        <ns2:fa>
+            <ns2:header vinLong="WBADEMC52MK000090" date="2026-10-26" time="12:00:00" createdBy=""/>
+            <ns2:standardFA series="F090" typeKey="73CH" timeCriteria="0321" colourCode="0C3D" fabricCode="X3SW" faVersion="3">
+                <ns2:eCodes/>
+                <ns2:saCodes>
+                    <ns2:saCode>1CA</ns2:saCode>
+                    <ns2:saCode>1CB</ns2:saCode>
+                    <ns2:saCode>2VB</ns2:saCode>
+                    <ns2:saCode>302</ns2:saCode>
+                    <ns2:saCode>322</ns2:saCode>
+                    <ns2:saCode>3AG</ns2:saCode>
+                    <ns2:saCode>423</ns2:saCode>
+                    <ns2:saCode>459</ns2:saCode>
+                    <ns2:saCode>4NB</ns2:saCode>
+                    <ns2:saCode>4UR</ns2:saCode>
+                    <ns2:saCode>548</ns2:saCode>
+                    <ns2:saCode>552</ns2:saCode>
+                    <ns2:saCode>5AC</ns2:saCode>
+                    <ns2:saCode>5AS</ns2:saCode>
+                    <ns2:saCode>609</ns2:saCode>
+                    <ns2:saCode>688</ns2:saCode>
+                    <ns2:saCode>6AC</ns2:saCode>
+                    <ns2:saCode>6AE</ns2:saCode>
+                    <ns2:saCode>6AK</ns2:saCode>
+                    <ns2:saCode>6U3</ns2:saCode>
+                    <ns2:saCode>6WD</ns2:saCode>
+                    <ns2:saCode>760</ns2:saCode>
+                    <ns2:saCode>8KA</ns2:saCode>
+                    <ns2:saCode>925</ns2:saCode>
+                    <ns2:saCode>9AA</ns2:saCode>
+                </ns2:saCodes>
+                <ns2:hoCodes/>
+            </ns2:standardFA>
+        </ns2:fa>
+    </id>
+</faList>

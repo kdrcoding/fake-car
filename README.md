@@ -118,6 +118,6 @@ jar cf builder\CarBuilder.jar -C classes .
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE).
+Free to use, change and share, with one rule: the "by kdrcoding" credit in the window stays in every copy and every changed version. See [LICENSE](LICENSE). Versions 1.0.0 to 1.2.0 were released under MIT.
 
 Not made by or connected with BMW AG. BMW, E-Sys and ISTA are names of their owners.

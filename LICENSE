@@ -1,6 +1,10 @@
-MIT License
+Fake Car Licence
 
 Copyright (c) 2026 kdrcoding
+
+This licence covers this repository from the commit that added it on. Versions
+1.0.0 to 1.2.0 were released under the MIT licence, and copies of those
+versions keep it.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -9,8 +13,17 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. The credit "by kdrcoding" shown in the program's window must stay in every
+   copy and every modified version of the Software that is distributed or
+   published, including any version built from this source code. It must stay
+   visible and readable, and it must not be removed, hidden, covered, changed
+   or replaced by another name. A modified version may add its own name next
+   to it.
+
+2. The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+A copy or modified version that does not meet condition 1 is not licensed.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,

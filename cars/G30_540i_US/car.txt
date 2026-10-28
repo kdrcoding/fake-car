@@ -1,0 +1,10 @@
+# Fake Car settings (made-up VIN: valid check digit, not a real car)
+# No I-steps here: the builder takes them from your PSdZData.
+NAME=BMW G30 540i (US, 2019)
+VIN=WBADEMC50KK000540
+KM=41720
+BATTERY_MV=12650
+BATTERY_AH=90
+ISTEP_SHIPMENT=S15A-19-03-575
+ISTEP_LAST=S15A-26-07-550
+ISTEP_CURRENT=S15A-26-07-550

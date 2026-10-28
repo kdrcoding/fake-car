@@ -7,5 +7,3 @@ ISTEP_CURRENT=S15A-26-07-550
 KM=8420
 BATTERY_MV=12710
 BATTERY_AH=90
-# The instrument cluster keeps its factory software, so E-Sys has something to flash.
-OUTDATED=60

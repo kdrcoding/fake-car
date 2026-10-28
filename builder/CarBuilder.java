@@ -80,6 +80,8 @@ public final class CarBuilder {
         Map<String, String> settings = settings(new File(car, "car.txt"));
         String faXml = read(new File(car, "FA.xml"));
         Order order = new Order(faXml);
+        // A car made from your own FA has no I-steps yet: take them from the KIS that knows its type key.
+        if (settings.get("ISTEP_CURRENT") == null) isteps(data, order, new File(car, "car.txt"), settings);
         String build = settings.get("ISTEP_SHIPMENT"), current = settings.get("ISTEP_CURRENT");
         String series = current.substring(0, 4);
 
@@ -245,15 +247,49 @@ public final class CarBuilder {
         }
     }
 
-    static List<String> kis(File kisFolder, Order order, String build, String current, Set<Integer> outdated) throws Exception {
-        // HSQLDB writes next to its files even read-only: work on a copy.
-        Path copy = Files.createTempDirectory("fakecar-kis");
-        File[] files = kisFolder.listFiles((d, n) -> n.startsWith("KIS."));
-        if (files == null || files.length == 0) throw new IllegalStateException("no KIS in " + kisFolder);
-        for (File f : files) Files.copy(f.toPath(), copy.resolve(f.getName()), StandardCopyOption.REPLACE_EXISTING);
+    /** The KIS of one I-step family, opened in place; files_readonly keeps HSQLDB from writing anything into PSdZData. */
+    static Connection open(File kisFolder) throws Exception {
+        if (!new File(kisFolder, "KIS.script").isFile()) throw new IllegalStateException("no KIS in " + kisFolder);
         Class.forName("org.hsqldb.jdbc.JDBCDriver");
+        return DriverManager.getConnection("jdbc:hsqldb:file:" + new File(kisFolder, "KIS").getPath().replace('\\', '/')
+                + ";readonly=true;ifexists=true;hsqldb.files_readonly=true", "SA", "");
+    }
+
+    /** ISTEP_SHIPMENT (the newest I-step at the order's time criteria) and ISTEP_CURRENT/LAST (the newest there is), added to car.txt. */
+    static void isteps(File data, Order order, File carTxt, Map<String, String> settings) throws Exception {
+        File[] families = new File(data, "psdzdata\\kiswb").listFiles(File::isDirectory);
+        if (families == null) throw new IllegalStateException("no KIS in " + data);
+        String month = order.time.substring(0, 2) + "-" + order.time.substring(2); // YY-MM
+        for (File family : families) {
+            if (!new File(family, "KIS.script").isFile()) continue;
+            try (Connection c = open(family)) {
+                PreparedStatement p = c.prepareStatement("SELECT COUNT(*) FROM KIS.FAHRZEUGTYP WHERE NAME=?");
+                p.setString(1, order.type);
+                ResultSet r = p.executeQuery();
+                if (!r.next() || r.getInt(1) == 0) continue;
+                String pattern = family.getName() + "-__-__-___", shipment = null, current = null;
+                r = c.createStatement().executeQuery("SELECT NAME FROM KIS.ISTUFE WHERE NAME LIKE '" + pattern + "' ORDER BY NAME");
+                while (r.next()) {
+                    String name = r.getString(1);
+                    if (name.substring(5, 10).compareTo(month) <= 0) shipment = name;
+                    current = name;
+                }
+                if (current == null) continue;
+                if (shipment == null) shipment = current;
+                settings.put("ISTEP_SHIPMENT", shipment);
+                settings.put("ISTEP_LAST", current);
+                settings.put("ISTEP_CURRENT", current);
+                String text = read(carTxt);
+                write(carTxt, text + (text.endsWith("\n") ? "" : "\n") + "ISTEP_SHIPMENT=" + shipment + "\nISTEP_LAST=" + current + "\nISTEP_CURRENT=" + current + "\n");
+                return;
+            }
+        }
+        throw new IllegalArgumentException("type key " + order.type + " is not in your PSdZData");
+    }
+
+    static List<String> kis(File kisFolder, Order order, String build, String current, Set<Integer> outdated) throws Exception {
         List<String> lines = new ArrayList<>();
-        try (Connection c = DriverManager.getConnection("jdbc:hsqldb:file:" + copy.resolve("KIS") + ";readonly=true;ifexists=true", "SA", "")) {
+        try (Connection c = open(kisFolder)) {
             try (PreparedStatement p = c.prepareStatement("SELECT TYPMERKMALE FROM KIS.FAHRZEUGTYP WHERE NAME=?")) {
                 p.setString(1, order.type);
                 ResultSet r = p.executeQuery();
@@ -281,8 +317,6 @@ public final class CarBuilder {
                 String line = software(c, e.getKey(), e.getValue()[0], e.getValue()[1], outdated.contains(e.getKey()) ? built : now);
                 if (line != null) lines.add(line);
             }
-        } finally {
-            deleteTree(copy.toFile());
         }
         return lines;
     }

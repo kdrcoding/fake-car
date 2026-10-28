@@ -22,7 +22,7 @@ Close the window to switch the car off. Everything you change stays for next tim
 ## What you need
 
 - Windows 10 or 11 (nothing else to install)
-- E-Sys with PSdZData: F010 for the F10, F020 for the F30 and F80 M3, S15A for the M5 CS, S18A for the G80 M3
+- E-Sys with PSdZData for the car's series: F010 (F10), F020 (F30, F80), F025 (F15), F056 (MINI F56), S15A (G30, F90), S18A (G20, G05, G80)
 
 ## What you can do with it
 
@@ -38,7 +38,7 @@ Close the window to switch the car off. Everything you change stays for next tim
 | Read and clear fault memory | Yes |
 | Module reset | Yes |
 
-Tested with E-Sys 25.10: connecting, reading and writing FA, FP and I-steps, SVT, coding, and the flash TAL calculation. A full flash run and the FSC actions inside E-Sys are not tested yet. ISTA finds cars the same way over the network, but it is not tested yet either.
+Tested with E-Sys 25.10: connecting, reading and writing FA, FP and I-steps, SVT, coding, and FSC actions (status, VIN, SID on the head unit). Flash planning finds the out-of-date module, but on this test PC E-Sys's TAL calculation currently stops with a PSdZ error, so a full flash run is not tested. ISTA finds cars the same way over the network, but it is not tested yet either.
 
 ## Car models
 
@@ -48,8 +48,13 @@ Tested with E-Sys 25.10: connecting, reading and writing FA, FP and I-steps, SVT
 | BMW F30 340i M Sport (US, 2017) | `cars\F30_340i_US` | 23 |
 | BMW F30 340i with old cluster software, for flash practice | `cars\F30_340i_US_flashtest` | 23 |
 | BMW F80 M3 (US, 2017) | `cars\F80_M3_US` | 24 |
-| BMW F90 M5 CS (US, 2021) with old cluster software, for flash practice | `cars\F90_M5_CS_US` | 29 |
+| BMW F90 M5 CS (US, 2021) | `cars\F90_M5_CS_US` | 29 |
 | BMW G80 M3 Competition xDrive (US, 2022) | `cars\G80_M3_Competition_US` | 26 |
+| BMW G20 330i (US, 2020) | `cars\G20_330i_US` | 23 |
+| BMW G05 X5 xDrive40i (US, 2020) | `cars\G05_X5_40i_US` | 27 |
+| BMW G30 540i (US, 2019) | `cars\G30_540i_US` | 22 |
+| BMW F15 X5 xDrive35i (US, 2016) | `cars\F15_X5_35i_US` | 26 |
+| MINI F56 Cooper S (US, 2018) | `cars\F56_Cooper_S_US` | 16 |
 
 Every VIN is made up.
 
@@ -59,11 +64,11 @@ Each car is built on your own PC from your own PSdZData, the way the factory put
 
 <img src="docs/esys-flash.png" alt="E-Sys TAL-Calculating with the Fake Car: the instrument cluster is marked for flashing" width="768">
 
-Use the **F90 M5 CS** or the **F30 340i with old cluster software**: their instrument cluster still has the software it was built with.
+Use the **F30 340i with old cluster software**: its instrument cluster still has the software it was built with. Flash planning works on F-series cars; on G-series cars E-Sys's TAL calculation does not finish yet.
 
 1. **Comfort Mode > TAL-Calculating**.
 2. Vehicle Order: **Read**. SVT Actual: **Read (ECU) without smart actuators**.
-3. SVT Target: tick **Complete Flash**, set **I-Step (shipm.)** to the car's `ISTEP_SHIPMENT` from `car.txt` (S15A-21-03-540 for the M5 CS, F020-17-07-503 for the F30), then **Calculate**.
+3. SVT Target: tick **Complete Flash**, set **I-Step (shipm.)** to the car's `ISTEP_SHIPMENT` from `car.txt` (F020-17-07-503 for the F30), then **Calculate**.
 4. TAL: **TAL calculation**, **Save**, then **Execute**.
 
 ## Write FA and FP
@@ -73,12 +78,16 @@ Use the **F90 M5 CS** or the **F30 340i with old cluster software**: their instr
 3. In the FA tree, right-click the FA and choose **Activate FA**. E-Sys works out the FP.
 4. Tab **Master**, **Write** under FA/FP.
 
-## Your own car model
+## Your own car
+
+Save your car's vehicle order in E-Sys (**Expert Mode > VCM**, **Read**, then **Save** the FA). In Fake Car, click **Add your own car** and pick that file. Fake Car makes a new car from it with a made-up VIN and takes the I-steps from your PSdZData. Press **Start**: it is built the first time.
+
+## Your own car model by hand
 
 Copy a car folder and change two files:
 
 - `FA.xml`: the vehicle order. `typeKey` (type key), `series` (development series, for example F030 for an F30), `timeCriteria` (MMYY), the SA codes.
-- `car.txt`: name, a made-up VIN with a valid check digit, the I-steps (`ISTEP_SHIPMENT` is when it was built), mileage, battery.
+- `car.txt`: name, a made-up VIN with a valid check digit, mileage, battery. The I-steps (`ISTEP_SHIPMENT`, `ISTEP_LAST`, `ISTEP_CURRENT`) are optional: without them the builder takes them from your PSdZData and writes them in.
 
 `faults.txt` lists the faults it has stored (module address, fault code, status, count, km).
 
@@ -100,6 +109,8 @@ FakeCar.exe --stop
 Every request and answer is written to `fakecar.log` in the car's folder.
 
 ## Good to know
+
+- Fake Car checks GitHub for a newer version when it starts and shows a link if there is one. Nothing is downloaded by itself. **About** shows the version.
 
 - One tester at a time, like the real central gateway.
 - Windows may ask about network access the first time. Other PCs only reach the car if you allow it; E-Sys on the same PC can always use the gateway URL.

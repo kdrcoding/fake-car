@@ -1,0 +1,10 @@
+# Fake Car settings (made-up VIN: valid check digit, not a real car)
+# No I-steps here: the builder takes them from your PSdZData.
+NAME=MINI F56 Cooper S (US, 2018)
+VIN=WMWDEMC58JK000056
+KM=52300
+BATTERY_MV=12650
+BATTERY_AH=90
+ISTEP_SHIPMENT=F056-18-03-541
+ISTEP_LAST=F056-26-07-530
+ISTEP_CURRENT=F056-26-07-530

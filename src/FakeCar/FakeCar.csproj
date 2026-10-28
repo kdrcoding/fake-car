@@ -9,9 +9,12 @@
     <RootNamespace>FakeCar</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
     <UseWindowsForms>true</UseWindowsForms>
-    <Version>1.2.0</Version>
+    <Version>1.3.0</Version>
     <Product>Fake Car</Product>
+    <AssemblyTitle>Fake Car by kdrcoding</AssemblyTitle>
     <Company>kdrcoding</Company>
+    <Authors>kdrcoding</Authors>
+    <Description>Fake Car by kdrcoding: a pretend BMW for E-Sys</Description>
     <Copyright>Copyright (c) 2026 kdrcoding</Copyright>
   </PropertyGroup>
 

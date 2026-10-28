@@ -1,0 +1,10 @@
+# Fake Car settings (made-up VIN: valid check digit, not a real car)
+# No I-steps here: the builder takes them from your PSdZData.
+NAME=BMW G05 X5 xDrive40i (US, 2020)
+VIN=WBADEMC59LK000005
+KM=28310
+BATTERY_MV=12650
+BATTERY_AH=90
+ISTEP_SHIPMENT=S18A-20-03-569
+ISTEP_LAST=S18A-26-07-550
+ISTEP_CURRENT=S18A-26-07-550

@@ -1,0 +1,10 @@
+# Fake Car settings (made-up VIN: valid check digit, not a real car)
+# No I-steps here: the builder takes them from your PSdZData.
+NAME=BMW F15 X5 xDrive35i (US, 2016)
+VIN=WBADEMC54GK000015
+KM=78450
+BATTERY_MV=12650
+BATTERY_AH=90
+ISTEP_SHIPMENT=F025-16-03-504
+ISTEP_LAST=F025-26-07-530
+ISTEP_CURRENT=F025-26-07-530

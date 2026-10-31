@@ -375,7 +375,7 @@ sealed class PickerForm : Form
         if (tray is not null) Options.LastCar = Path.GetFileName(m.Folder); // not from picture tests
         var token = running.Token;
         var wipe = allowFresh && fresh.Checked;
-        var bind = Options.Network ? IPAddress.Any : IPAddress.Loopback;
+        var bind = pictureBind ?? (Options.Network ? IPAddress.Any : IPAddress.Loopback);
         task = Task.Run(() => Program.Run(m.Folder, bind, wipe, null, token, peer =>
         {
             try { BeginInvoke(() => Tester(m, peer)); }
@@ -463,8 +463,12 @@ sealed class PickerForm : Form
         tray.Text = text.Length > 127 ? text[..127] : text;
     }
 
-    public void TakePicture(string path, bool startCar)
+    IPAddress? pictureBind;
+
+    /// <param name="bind">Where the picture's car answers: 127.0.0.2 when another Fake Car holds 127.0.0.1.</param>
+    public void TakePicture(string path, IPAddress bind)
     {
+        pictureBind = bind;
         StartPosition = FormStartPosition.Manual;
         Location = new Point(-6000, -6000);
         ShowInTaskbar = false;
@@ -486,11 +490,6 @@ sealed class PickerForm : Form
                 form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size));
                 bitmap.Save(Path.ChangeExtension(path, ".practice.png"));
             }
-            if (!startCar)
-            {
-                Close();
-                return;
-            }
             list.SelectedIndex = list.Items.Count - 1;
             start.PerformClick();
             for (var i = 0; i < 360 && (building || runningModel is null) && !status.Text.StartsWith("Could not", StringComparison.Ordinal); i++) await Task.Delay(500);
@@ -500,9 +499,17 @@ sealed class PickerForm : Form
             if (runningModel is not null)
             {
                 using var tester = new System.Net.Sockets.TcpClient();
-                await tester.ConnectAsync(IPAddress.Loopback, 6801);
+                await tester.ConnectAsync(bind, 6801);
                 await Task.Delay(800);
                 Save(Path.ChangeExtension(path, ".connected.png"));
+                // The clock icon's menu, as it shows with this car running.
+                using var menu = new ContextMenuStrip();
+                FillMenu(menu);
+                menu.Show(new Point(-6000, -6000));
+                using var shot = new Bitmap(menu.Width, menu.Height);
+                menu.DrawToBitmap(shot, new Rectangle(Point.Empty, menu.Size));
+                shot.Save(Path.ChangeExtension(path, ".menu.png"));
+                menu.Close();
             }
             Close();
         };

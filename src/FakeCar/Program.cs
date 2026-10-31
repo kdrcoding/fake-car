@@ -43,8 +43,8 @@ static class Program
             using var showEvent = picture is null ? new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName) : null;
             var form = new PickerForm(CarsFolder(), stopEvent, showEvent, background: picture is null && options.ContainsKey("background"));
             // --picture <png>: tests draw the window off-screen, start the last car, and save what it shows.
-            // (With another Fake Car running, only the window is drawn: no car is started.)
-            if (picture is not null) form.TakePicture(picture, startCar: createdNew);
+            // With another Fake Car on 127.0.0.1, the picture's car answers on 127.0.0.2 so both can run.
+            if (picture is not null) form.TakePicture(picture, IPAddress.Parse(createdNew ? "127.0.0.1" : "127.0.0.2"));
             Application.Run(form);
             return 0;
         }

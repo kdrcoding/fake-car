@@ -240,7 +240,7 @@ sealed class PickerForm : Form
         building = true;
         start.Enabled = false;
         list.Enabled = false;
-        status.Text = $"Building {m.Name} from your PSdZData. This takes about half a minute, once.";
+        status.Text = $"Building {m.Name} from your PSdZData. This takes a minute or two, once.";
         var (ok, message) = await Builder.Build(m.Folder);
         building = false;
         list.Enabled = true;
@@ -296,7 +296,7 @@ sealed class PickerForm : Form
             }
             list.SelectedIndex = list.Items.Count - 1;
             start.PerformClick();
-            for (var i = 0; i < 180 && (building || runningModel is null) && !status.Text.StartsWith("Could not", StringComparison.Ordinal); i++) await Task.Delay(500);
+            for (var i = 0; i < 360 && (building || runningModel is null) && !status.Text.StartsWith("Could not", StringComparison.Ordinal); i++) await Task.Delay(500);
             await Task.Delay(1000);
             Save(path);
             Close();

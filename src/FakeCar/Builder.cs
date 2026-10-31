@@ -15,14 +15,15 @@ static class Builder
         var data = PsdzHome(esys);
         if (!Directory.Exists(Path.Combine(data, "psdzdata", "kiswb"))) return (false, $"no PSdZData in {data}\\psdzdata.");
 
-        var start = new ProcessStartInfo("cmd.exe")
+        // cmd /s /c "<whole line>": the outer quotes are the only ones cmd takes off, so paths with spaces (Fake Car in
+        // "C:\Users\John Doe\Downloads", E-Sys in "C:\EC-Apps\ESG\E-Sys 25.10") keep theirs. Windows paths hold no quotes.
+        var start = new ProcessStartInfo("cmd.exe", $"/s /c \"\"{script}\" \"{carFolder}\" \"{esys}\" \"{data}\"\"")
         {
             CreateNoWindow = true,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
-        foreach (var a in new[] { "/c", script, carFolder, esys, data }) start.ArgumentList.Add(a);
         using var process = Process.Start(start)!;
         var said = new StringBuilder();
         var output = process.StandardOutput.ReadToEndAsync();
@@ -34,12 +35,17 @@ static class Builder
         return (process.ExitCode == 0, process.ExitCode == 0 ? last : $"{last} (exit {process.ExitCode})");
     }
 
-    /// <summary>The newest E-Sys install: a folder with lib\PsdZ\psdz-api.jar and its own Java.</summary>
+    /// <summary>
+    /// The newest E-Sys install: a folder with lib\PsdZ\psdz-api.jar and its own Java. Under C:\EC-Apps and Program Files
+    /// one level deeper too (C:\EC-Apps\ESG\E-Sys 25.10, as the E-Sys installer suggests).
+    /// </summary>
     static string? FindEsys()
     {
-        var roots = new[] { @"C:\EC-Apps", @"C:\", Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86) };
-        return roots.Where(Directory.Exists)
-            .SelectMany(r => SafeDirectories(r).Prepend(r))
+        var deep = new[] { @"C:\EC-Apps", Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86) }
+            .Where(Directory.Exists)
+            .SelectMany(r => SafeDirectories(r).SelectMany(d => SafeDirectories(d).Prepend(d)).Prepend(r));
+        var shallow = SafeDirectories(@"C:\").Prepend(@"C:\");
+        return deep.Concat(shallow).Distinct(StringComparer.OrdinalIgnoreCase)
             .Where(d => File.Exists(Path.Combine(d, "lib", "PsdZ", "psdz-api.jar")) && File.Exists(Path.Combine(d, "jre", "bin", "java.exe")))
             .OrderByDescending(d => File.GetLastWriteTimeUtc(Path.Combine(d, "lib", "PsdZ", "psdz-api.jar")))
             .FirstOrDefault();

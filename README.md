@@ -17,7 +17,21 @@ Use it to learn E-Sys, try a coding tool before it touches a real car, or record
    - choose **Connection via gateway URL**, enter `tcp://127.0.0.1:6801`, pick the target the Fake Car window shows for the running car (for example `F020_26_07_530` for the F30), and tick **Read parameters from VCM**. A target of another series connects too, but E-Sys's TAL calculation then stops with a PSdZ error ("DetailInfo must not be null").
 4. Work as you would with a real car.
 
-Close the window to switch the car off. Everything you change stays for next time. Tick **Start fresh** to go back to the car as it left the factory.
+Close the window and the car keeps running next to the clock: click the Fake Car icon there to open the window, stop the car or quit. Everything you change stays for next time. Tick **Start fresh** to go back to the car as it left the factory.
+
+## Options
+
+Click **Options** in the window (or in the icon's menu). Each choice works as soon as you tick it.
+
+| Option | What it does |
+|---|---|
+| Keep the car running when I close the window | On by default. Off: closing the window switches the car off. |
+| Start the last car when Fake Car opens | The car you used last starts by itself. |
+| Start Fake Car with Windows | Fake Car starts next to the clock, without the window, with the last car on. |
+| Tell me when a tester connects | A short note next to the clock while the window is closed. The window always shows it. |
+| Let other PCs on the network connect | On by default. Off: only E-Sys on this PC can connect, with the gateway URL `tcp://127.0.0.1:6801`. |
+
+Options are kept in `%APPDATA%\FakeCar\options.txt`, so a newer Fake Car keeps them.
 
 ## What you need
 
@@ -106,8 +120,11 @@ builder\build-car.cmd cars\F30_340i_US C:\EC-Apps\E-Sys C:\Data
 
 ```
 FakeCar.exe --car cars\F30_340i_US [--bind 127.0.0.1] [--fresh] [--log fakecar.log]
+FakeCar.exe --background
 FakeCar.exe --stop
 ```
+
+`--background` starts Fake Car next to the clock with the last car on, as **Start with Windows** does. `--stop` switches off and closes any Fake Car.
 
 Every request and answer is written to `fakecar.log` in the car's folder.
 

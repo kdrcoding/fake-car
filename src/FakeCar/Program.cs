@@ -5,12 +5,14 @@ namespace FakeCar;
 /// <summary>
 /// Fake Car: a pretend BMW on the network for demos and tests.
 ///   FakeCar.exe                      a small window to pick the car model and start / stop it
+///   FakeCar.exe --background         no window, just the icon next to the clock; starts the last car (Start with Windows)
 ///   FakeCar.exe --car "cars\F10_550i_xDrive_US" [--bind 0.0.0.0] [--log fakecar.log] [--fresh]   no window
 ///   FakeCar.exe --stop
 /// </summary>
 static class Program
 {
     const string StopEventName = @"Local\FakeCar.Stop";
+    const string ShowEventName = @"Local\FakeCar.Show";
 
     [STAThread]
     static int Main(string[] args)
@@ -29,10 +31,17 @@ static class Program
             var picture = options.GetValueOrDefault("picture");
             if (!createdNew && picture is null)
             {
+                // A second start brings the running window to the front (also when it sits next to the clock).
+                if (EventWaitHandle.TryOpenExisting(ShowEventName, out var show))
+                {
+                    if (!options.ContainsKey("background")) show.Set();
+                    return 0;
+                }
                 MessageBox.Show("Fake Car is already running.", "Fake Car", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return 2;
             }
-            var form = new PickerForm(CarsFolder(), stopEvent);
+            using var showEvent = picture is null ? new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName) : null;
+            var form = new PickerForm(CarsFolder(), stopEvent, showEvent, background: picture is null && options.ContainsKey("background"));
             // --picture <png>: tests draw the window off-screen, start the last car, and save what it shows.
             // (With another Fake Car running, only the window is drawn: no car is started.)
             if (picture is not null) form.TakePicture(picture, startCar: createdNew);
@@ -49,7 +58,7 @@ static class Program
     }
 
     /// <summary>Loads the car and answers on the network until stopped. 0 = stopped, 1 = failed (see the log).</summary>
-    public static async Task<int> Run(string folder, IPAddress bind, bool fresh, string? logPath, CancellationToken stop)
+    public static async Task<int> Run(string folder, IPAddress bind, bool fresh, string? logPath, CancellationToken stop, Action<IPEndPoint?>? testers = null)
     {
         using var log = new Log(logPath ?? Path.Combine(folder, "fakecar.log"));
         try
@@ -60,7 +69,7 @@ static class Program
                 car.Forget();
                 car = Car.Load(folder);
             }
-            await new Gateway(car, new Diagnostics(car, log), log, bind).RunAsync(stop);
+            await new Gateway(car, new Diagnostics(car, log), log, bind, testers).RunAsync(stop);
             log.Line("stopped");
             return 0;
         }

@@ -7,9 +7,9 @@ namespace FakeCar;
 
 /// <summary>
 /// The car's Ethernet gateway as an F10 ZGW shows it on the OBD cable: HSFZ on TCP 6801 (one tester at a time,
-/// a second one is reset), and the vehicle search on UDP 6811.
+/// a second one is reset), and the vehicle search on UDP 6811. <paramref name="testers"/> hears who connects (null = gone).
 /// </summary>
-sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind)
+sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, Action<IPEndPoint?>? testers = null)
 {
     const int DiagPort = 6801;
     const int SearchPort = 6811;
@@ -54,6 +54,7 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind)
     {
         var peer = client.Client.RemoteEndPoint;
         log.Line($"tester connected {peer}");
+        testers?.Invoke(peer as IPEndPoint);
         client.NoDelay = true;
         var stream = client.GetStream();
         var header = new byte[6];
@@ -92,6 +93,7 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind)
             log.Line($"tester gone {peer}");
             client.Close();
             lock (busy) tester = null;
+            testers?.Invoke(null);
         }
     }
 

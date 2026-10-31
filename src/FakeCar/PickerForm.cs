@@ -2,7 +2,10 @@ using System.Net;
 
 namespace FakeCar;
 
-/// <summary>The window: every car model in the cars folder, pick one and start it. Closing the window stops the car.</summary>
+/// <summary>
+/// The window: every car model in the cars folder, pick one and start it. The Fake Car icon next to the clock opens it,
+/// stops the car or quits; closing the window while a car runs keeps the car running there (Options).
+/// </summary>
 sealed class PickerForm : Form
 {
     sealed record Model(string Folder, string Name, string Vin, int Modules, string Target)
@@ -18,22 +21,32 @@ sealed class PickerForm : Form
     readonly Button start = new() { Text = "Start", Width = 110, Height = 32 };
     readonly Label status = new() { Dock = DockStyle.Fill, AutoEllipsis = true, ForeColor = SystemColors.GrayText };
     readonly LinkLabel addCar = new() { Text = "Add your own car", AutoSize = true, Margin = new Padding(0, 0, 14, 0) };
+    readonly LinkLabel options = new() { Text = "Options", AutoSize = true, Margin = new Padding(0, 0, 14, 0) };
     readonly LinkLabel about = new() { Text = "About", AutoSize = true, Margin = new Padding(0, 0, 14, 0) };
     readonly LinkLabel update = new() { AutoSize = true, Visible = false, Margin = Padding.Empty };
     readonly string carsFolder;
+    readonly NotifyIcon? tray;
 
     CancellationTokenSource? running;
     Task<int>? task;
     Model? runningModel;
+    string? testerAt;
+    DateTime toldConnect;
+    bool allowShow, quitting;
+    Model? autoStart;
 
     const string Page = "https://github.com/kdrcoding/fake-car";
 
     public static string Version => typeof(PickerForm).Assembly.GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "";
 
-    public PickerForm(string carsFolder, EventWaitHandle stopEvent)
+    /// <param name="showEvent">Set by a second FakeCar.exe start: bring this window up. Null in picture tests (no icon then).</param>
+    /// <param name="background">Started with Windows: only the icon next to the clock, the last car switched on.</param>
+    public PickerForm(string carsFolder, EventWaitHandle stopEvent, EventWaitHandle? showEvent, bool background)
     {
         this.carsFolder = carsFolder;
+        allowShow = !background;
         Text = $"Fake Car {Version} by kdrcoding";
+        Icon = AppIcon(32);
         Font = new Font("Segoe UI", 9.5f);
         ClientSize = new Size(480, 384);
         MinimumSize = new Size(420, 300);
@@ -49,6 +62,7 @@ sealed class PickerForm : Form
         start.Click += async (_, _) => await Toggle();
 
         addCar.LinkClicked += (_, _) => AddOwnCar();
+        options.LinkClicked += (_, _) => ShowOptions();
         about.LinkClicked += (_, _) => ShowAbout();
         update.LinkClicked += (_, _) => Open(update.Tag as string ?? Page + "/releases/latest");
 
@@ -63,7 +77,7 @@ sealed class PickerForm : Form
         bottom.Controls.Add(status, 0, 1);
         bottom.SetColumnSpan(status, 2);
         var links = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false, Margin = Padding.Empty };
-        links.Controls.AddRange([addCar, about, update]);
+        links.Controls.AddRange([addCar, options, about, update]);
         bottom.Controls.Add(links, 0, 2);
         bottom.SetColumnSpan(links, 2);
 
@@ -78,11 +92,133 @@ sealed class PickerForm : Form
         Controls.Add(bottom);
         Controls.Add(header);
         AcceptButton = start;
+
+        if (showEvent is not null)
+        {
+            tray = new NotifyIcon { Icon = AppIcon(16), ContextMenuStrip = new ContextMenuStrip(), Visible = true };
+            tray.ContextMenuStrip.Opening += (_, _) => FillMenu(tray.ContextMenuStrip);
+            tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) ShowWindow(); };
+            tray.BalloonTipClicked += (_, _) => ShowWindow();
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    while (showEvent.WaitOne()) BeginInvoke(ShowWindow);
+                }
+                catch (Exception e) when (e is ObjectDisposedException or InvalidOperationException)
+                {
+                    // Fake Car is closing.
+                }
+            });
+            // Opened from Windows, or Start the last car ticked: switch it on once the window's handle exists.
+            if (background || Options.StartLastCar)
+                autoStart = list.Items.Cast<Model>().FirstOrDefault(m => Path.GetFileName(m.Folder).Equals(Options.LastCar, StringComparison.OrdinalIgnoreCase));
+        }
         ShowState();
 
         // FakeCar.exe --stop closes the window too.
-        _ = Task.Run(() => { stopEvent.WaitOne(); BeginInvoke(Close); });
+        _ = Task.Run(() => { stopEvent.WaitOne(); BeginInvoke(Quit); });
         Shown += async (_, _) => await CheckForUpdate();
+    }
+
+    static Icon AppIcon(int size)
+    {
+        using var stream = typeof(PickerForm).Assembly.GetManifestResourceStream("FakeCar.fakecar.ico");
+        return stream is null ? SystemIcons.Application : new Icon(stream, new Size(size, size));
+    }
+
+    /// <summary>The icon's menu, made fresh each time it opens so it shows what runs now.</summary>
+    void FillMenu(ContextMenuStrip menu)
+    {
+        menu.Items.Clear();
+        menu.Items.Add(new ToolStripMenuItem(runningModel is { } r ? $"Running: {r.Name}" : building ? "Building a car" : "No car running") { Enabled = false });
+        menu.Items.Add(new ToolStripSeparator());
+        var open = new ToolStripMenuItem("Open Fake Car", null, (_, _) => ShowWindow());
+        open.Font = new Font(open.Font, FontStyle.Bold);
+        menu.Items.Add(open);
+        if (runningModel is not null)
+            menu.Items.Add("Stop the car", null, async (_, _) => await StopCar());
+        else if (!building && list.Items.Cast<Model>().FirstOrDefault(m => Path.GetFileName(m.Folder).Equals(Options.LastCar, StringComparison.OrdinalIgnoreCase)) is { } last)
+            menu.Items.Add($"Start {last.Name}", null, async (_, _) => { list.SelectedItem = last; await StartSelected(); });
+        if ((runningModel ?? Selected) is { } car && File.Exists(Path.Combine(car.Folder, "fakecar.log")))
+            menu.Items.Add("Open the car's log", null, (_, _) => Open(Path.Combine(car.Folder, "fakecar.log")));
+        menu.Items.Add("Options", null, (_, _) => ShowOptions());
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Quit Fake Car", null, (_, _) => Quit());
+    }
+
+    void ShowWindow()
+    {
+        allowShow = true;
+        Show();
+        if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+        Activate();
+    }
+
+    /// <summary>Stops the car and closes Fake Car for real (the icon's Quit, FakeCar.exe --stop).</summary>
+    void Quit()
+    {
+        quitting = true;
+        Close();
+    }
+
+    /// <summary>A note next to the clock, only while the window is not open (the window shows everything itself).</summary>
+    void Tell(string text, bool problem = false)
+    {
+        if (tray is null || Visible) return;
+        tray.ShowBalloonTip(5000, "Fake Car", text, problem ? ToolTipIcon.Warning : ToolTipIcon.Info);
+    }
+
+    async void ShowOptions()
+    {
+        var network = Options.Network;
+        using (var form = new OptionsForm())
+        {
+            if (!Visible) form.StartPosition = FormStartPosition.CenterScreen;
+            form.ShowDialog(Visible ? this : null);
+        }
+        // Who may connect changed: the running car starts again with the new choice (what was coded stays).
+        if (network != Options.Network && runningModel is { } m && !building)
+        {
+            list.SelectedItem = m;
+            await StartSelected(allowFresh: false);
+        }
+    }
+
+    /// <summary>The gateway's news: a tester connected (where from) or left (null). Comes from the car's thread.</summary>
+    void Tester(Model m, IPEndPoint? peer)
+    {
+        if (runningModel != m) return;
+        testerAt = peer is null ? null : IPAddress.IsLoopback(peer.Address) ? "this PC" : peer.Address.ToString();
+        ShowState();
+        if (testerAt is not null && Options.Notify && DateTime.UtcNow - toldConnect > TimeSpan.FromMinutes(1))
+        {
+            toldConnect = DateTime.UtcNow;
+            Tell($"A tester connected to the {m.Name} from {testerAt}.");
+        }
+    }
+
+    // Started with Windows: the window stays hidden until the icon or a second start opens it.
+    protected override void SetVisibleCore(bool value)
+    {
+        if (!allowShow)
+        {
+            value = false;
+            if (!IsHandleCreated) CreateHandle();
+        }
+        base.SetVisibleCore(value);
+    }
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        if (autoStart is not { } m) return;
+        autoStart = null;
+        BeginInvoke(async () =>
+        {
+            list.SelectedItem = m;
+            await StartSelected();
+        });
     }
 
     /// <summary>Asks GitHub for the newest release; a newer one shows a quiet link. No answer, no link.</summary>
@@ -207,7 +343,8 @@ sealed class PickerForm : Form
         else await StartSelected();
     }
 
-    async Task StartSelected()
+    /// <param name="allowFresh">False when the same car starts again by itself (Options): Start fresh is not for that.</param>
+    async Task StartSelected(bool allowFresh = true)
     {
         if (Selected is not { } m || building) return;
         await StopCar();
@@ -215,9 +352,15 @@ sealed class PickerForm : Form
         m = (Model)list.SelectedItem!;
         running = new CancellationTokenSource();
         runningModel = m;
+        if (tray is not null) Options.LastCar = Path.GetFileName(m.Folder); // not from picture tests
         var token = running.Token;
-        var wipe = fresh.Checked;
-        task = Task.Run(() => Program.Run(m.Folder, IPAddress.Any, wipe, null, token));
+        var wipe = allowFresh && fresh.Checked;
+        var bind = Options.Network ? IPAddress.Any : IPAddress.Loopback;
+        task = Task.Run(() => Program.Run(m.Folder, bind, wipe, null, token, peer =>
+        {
+            try { BeginInvoke(() => Tester(m, peer)); }
+            catch (InvalidOperationException) { } // the window is gone
+        }));
         ShowState();
         list.Invalidate();
 
@@ -226,9 +369,12 @@ sealed class PickerForm : Form
         if (runningModel == m && !token.IsCancellationRequested)
         {
             runningModel = null;
+            testerAt = null;
             status.Text = result == 0 ? "Stopped." : "Could not start this car. Is another Fake Car or a real car tool using port 6801? Details: fakecar.log in the car's folder.";
             start.Text = "Start";
             list.Invalidate();
+            UpdateTray();
+            if (result != 0) Tell($"Could not start the {m.Name}. Open Fake Car to see why.", problem: true);
         }
     }
 
@@ -241,6 +387,7 @@ sealed class PickerForm : Form
         start.Enabled = false;
         list.Enabled = false;
         status.Text = $"Building {m.Name} from your PSdZData. This takes a minute or two, once.";
+        UpdateTray();
         var (ok, message) = await Builder.Build(m.Folder);
         building = false;
         list.Enabled = true;
@@ -248,6 +395,8 @@ sealed class PickerForm : Form
         if (!ok || ModelIn(m.Folder) is not { Modules: > 0 } built)
         {
             status.Text = "Could not build this car: " + message;
+            UpdateTray();
+            Tell($"Could not build the {m.Name}. Open Fake Car to see why.", problem: true);
             return null;
         }
         list.Items[list.Items.IndexOf(m)] = built;
@@ -263,12 +412,14 @@ sealed class PickerForm : Form
         running.Dispose();
         running = null;
         runningModel = null;
+        testerAt = null;
         ShowState();
         list.Invalidate();
     }
 
     void ShowState()
     {
+        UpdateTray();
         if (building) return;
         start.Enabled = Selected is not null;
         if (runningModel is null)
@@ -278,7 +429,18 @@ sealed class PickerForm : Form
             return;
         }
         start.Text = Selected == runningModel ? "Stop" : "Switch";
-        status.Text = $"Running: {runningModel.Name}. In E-Sys, Open Connection and {runningModel.Connect}.";
+        status.Text = testerAt is not null
+            ? $"Running: {runningModel.Name}. A tester is connected from {testerAt}."
+            : $"Running: {runningModel.Name}. In E-Sys, Open Connection and {runningModel.Connect}.";
+    }
+
+    /// <summary>The icon's hover text: what runs now.</summary>
+    void UpdateTray()
+    {
+        if (tray is null) return;
+        var text = runningModel is { } r ? $"Fake Car: {r.Name}" + (testerAt is not null ? ", tester connected" : " running")
+            : building ? "Fake Car: building a car" : "Fake Car: no car running";
+        tray.Text = text.Length > 127 ? text[..127] : text;
     }
 
     public void TakePicture(string path, bool startCar)
@@ -289,6 +451,13 @@ sealed class PickerForm : Form
         Shown += async (_, _) =>
         {
             Save(Path.ChangeExtension(path, ".idle.png"));
+            using (var form = new OptionsForm { StartPosition = FormStartPosition.Manual, Location = new Point(-6000, -6000) })
+            {
+                form.Show();
+                using var bitmap = new Bitmap(form.Width, form.Height);
+                form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size));
+                bitmap.Save(Path.ChangeExtension(path, ".options.png"));
+            }
             if (!startCar)
             {
                 Close();
@@ -299,6 +468,14 @@ sealed class PickerForm : Form
             for (var i = 0; i < 360 && (building || runningModel is null) && !status.Text.StartsWith("Could not", StringComparison.Ordinal); i++) await Task.Delay(500);
             await Task.Delay(1000);
             Save(path);
+            // A tester connecting shows in the status line.
+            if (runningModel is not null)
+            {
+                using var tester = new System.Net.Sockets.TcpClient();
+                await tester.ConnectAsync(IPAddress.Loopback, 6801);
+                await Task.Delay(800);
+                Save(Path.ChangeExtension(path, ".connected.png"));
+            }
             Close();
         };
     }
@@ -312,8 +489,31 @@ sealed class PickerForm : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
+        // The window's X with a car running (or being built): the car stays on, next to the clock.
+        if (!quitting && e.CloseReason == CloseReason.UserClosing && tray is not null && Options.KeepRunning && (runningModel is not null || building))
+        {
+            e.Cancel = true;
+            Hide();
+            if (!Options.ToldAboutTray)
+            {
+                Options.ToldAboutTray = true;
+                tray.ShowBalloonTip(8000, "Fake Car keeps running",
+                    $"The {(runningModel ?? Selected)?.Name ?? "car"} is still on. Click the Fake Car icon here to open it, stop the car or quit.", ToolTipIcon.Info);
+            }
+            return;
+        }
         running?.Cancel();
         task?.Wait(3000);
         base.OnFormClosing(e);
+    }
+
+    protected override void OnFormClosed(FormClosedEventArgs e)
+    {
+        if (tray is not null)
+        {
+            tray.Visible = false;
+            tray.Dispose();
+        }
+        base.OnFormClosed(e);
     }
 }

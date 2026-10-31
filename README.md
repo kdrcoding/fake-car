@@ -23,16 +23,7 @@ Everything you change stays for next time. Tick **Start fresh** to go back to th
 
 Click **Practice** in the window to make the picked car misbehave on purpose, the way real cars do.
 
-<table>
-<tr>
-<td width="50%" valign="top"><img src="docs/practice.png" alt="The Practice window: problems to practise on, erase a module's coding data, save points" width="400"></td>
-<td width="50%" valign="top"><img src="docs/esys-caf-selection.png" alt="E-Sys CAF Selection: CAFD_00000069_010_002_054 for the instrument cluster, at every I-step" width="380"></td>
-</tr>
-<tr>
-<td valign="top">The Practice window</td>
-<td valign="top">Fixing <code>CAFD_FFFFFFFF</code>: E-Sys offers the cluster's CAFD</td>
-</tr>
-</table>
+<img src="docs/practice.png" alt="The Practice window: problems to practise on, erase a module's coding data, save points" width="420">
 
 | Problem | What E-Sys sees |
 |---|---|
@@ -42,17 +33,27 @@ Click **Practice** in the window to make the picked car misbehave on purpose, th
 | The connection drops during coding | The connection breaks once, at the third coding write. |
 | Low battery | The engine computer reports 11.4 V. |
 
-**Fix `CAFD_FFFFFFFF`** in E-Sys, Expert Mode > Coding:
-
-1. **Read** the vehicle order, then **Read (ECU)** under SVT Actual. The module shows `CAFD_FFFFFFFF_255_255_255`.
-2. Click the **module's line** (for example `KOMBI [0x60]`), not the CAFD line.
-3. Press **Detect CAF for SWE** under SVT Target, pick a CAFD in the list, **OK**.
-4. With the module still selected, press **Code**.
-5. **Read (ECU)** again: the CAFD is back.
-
 **Save points** keep the car as it is (everything coded, flashed or written) so you can go back to it later, for example before a risky change or for a second take of a video. **Start fresh** still goes back to the car as it left the factory.
 
 A running car starts again by itself with your changes when you close the Practice window. Problems are kept in `problems.txt`, save points in `savepoints`, both in the car's folder.
+
+### Fix CAFD_FFFFFFFF in E-Sys
+
+Erase the instrument cluster's coding data in **Practice**, connect, and open **Expert Mode > Coding**. These pictures are from E-Sys 25.10 with the F10.
+
+**1.** **Read** the vehicle order, then **Read (ECU)** under SVT Actual. The cluster shows `CAFD_FFFFFFFF_255_255_255`: it has no coding data.
+
+<img src="docs/esys-cafd-before.png" alt="E-Sys SVT: KOMBI [0x60] with CAFD_FFFFFFFF_255_255_255" width="760">
+
+**2.** Click the **module's line**, `KOMBI [0x60]`, not the CAFD line. Press **Detect CAF for SWE** under SVT Target. E-Sys lists the CAFD that fits the cluster's software at each I-step: pick one and press **OK**.
+
+<img src="docs/esys-caf-selection.png" alt="E-Sys CAF Selection: CAFD_00000069_010_002_054 picked for KOMBI" width="380">
+
+**3.** With `KOMBI [0x60]` still selected, press **Code**. E-Sys codes the cluster with that CAFD.
+
+**4.** **Read (ECU)** again: the cluster has its CAFD back.
+
+<img src="docs/esys-cafd-after.png" alt="E-Sys SVT after coding: KOMBI [0x60] with CAFD_00000069_010_002_054" width="760">
 
 ## Runs next to the clock
 

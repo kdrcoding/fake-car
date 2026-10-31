@@ -105,11 +105,21 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, 
         log.Line($"{source:X2}->{target:X2} {Convert.ToHexString(request)}");
         // The gateway confirms every request first (control 0002, the start of what it got).
         await SendAsync(stream, ControlAck, body[..Math.Min(body.Length, 7)], stop);
+        if (diagnostics.DropsHere(request))
+        {
+            log.Line("   connection dropped (practice)");
+            throw new IOException("dropped on purpose");
+        }
         IEnumerable<Ecu> who = target == Functional
             ? car.Ecus.Values
             : car.Ecus.TryGetValue(target, out var one) ? [one] : [];
         foreach (var ecu in who)
         {
+            if (car.Silent.Contains(ecu.Address))
+            {
+                if (target != Functional) log.Line($"   {ecu.Address:X2} silent (practice: does not answer)");
+                continue;
+            }
             var answer = diagnostics.Answer(ecu, request, target == Functional);
             if (answer is null) continue;
             log.Line($"   {ecu.Address:X2}<- {Hex(answer)}");

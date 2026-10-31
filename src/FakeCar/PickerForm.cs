@@ -21,6 +21,7 @@ sealed class PickerForm : Form
     readonly Button start = new() { Text = "Start", Width = 110, Height = 32 };
     readonly Label status = new() { Dock = DockStyle.Fill, AutoEllipsis = true, ForeColor = SystemColors.GrayText };
     readonly LinkLabel addCar = new() { Text = "Add your own car", AutoSize = true, Margin = new Padding(0, 0, 14, 0) };
+    readonly LinkLabel practice = new() { Text = "Practice", AutoSize = true, Margin = new Padding(0, 0, 14, 0) };
     readonly LinkLabel options = new() { Text = "Options", AutoSize = true, Margin = new Padding(0, 0, 14, 0) };
     readonly LinkLabel about = new() { Text = "About", AutoSize = true, Margin = new Padding(0, 0, 14, 0) };
     readonly LinkLabel update = new() { AutoSize = true, Visible = false, Margin = Padding.Empty };
@@ -62,6 +63,7 @@ sealed class PickerForm : Form
         start.Click += async (_, _) => await Toggle();
 
         addCar.LinkClicked += (_, _) => AddOwnCar();
+        practice.LinkClicked += async (_, _) => await ShowPractice();
         options.LinkClicked += (_, _) => ShowOptions();
         about.LinkClicked += (_, _) => ShowAbout();
         update.LinkClicked += (_, _) => Open(update.Tag as string ?? Page + "/releases/latest");
@@ -77,7 +79,7 @@ sealed class PickerForm : Form
         bottom.Controls.Add(status, 0, 1);
         bottom.SetColumnSpan(status, 2);
         var links = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false, Margin = Padding.Empty };
-        links.Controls.AddRange([addCar, options, about, update]);
+        links.Controls.AddRange([addCar, practice, options, about, update]);
         bottom.Controls.Add(links, 0, 2);
         bottom.SetColumnSpan(links, 2);
 
@@ -179,6 +181,24 @@ sealed class PickerForm : Form
         }
         // Who may connect changed: the running car starts again with the new choice (what was coded stays).
         if (network != Options.Network && runningModel is { } m && !building)
+        {
+            list.SelectedItem = m;
+            await StartSelected(allowFresh: false);
+        }
+    }
+
+    /// <summary>Problems, CAFD erase and save points for the picked car; a running car starts again with the changes.</summary>
+    async Task ShowPractice()
+    {
+        if (Selected is not { } m) return;
+        if (m.Modules == 0)
+        {
+            status.Text = $"Start the {m.Name} once first: it is built from your PSdZData then.";
+            return;
+        }
+        bool changed;
+        using (var form = new PracticeForm(m.Folder, m.Name)) { form.ShowDialog(this); changed = form.Changed; }
+        if (changed && runningModel == m && !building)
         {
             list.SelectedItem = m;
             await StartSelected(allowFresh: false);
@@ -457,6 +477,14 @@ sealed class PickerForm : Form
                 using var bitmap = new Bitmap(form.Width, form.Height);
                 form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size));
                 bitmap.Save(Path.ChangeExtension(path, ".options.png"));
+            }
+            if (list.Items.Cast<Model>().LastOrDefault(m => m.Modules > 0) is { } built)
+            {
+                using var form = new PracticeForm(built.Folder, built.Name) { StartPosition = FormStartPosition.Manual, Location = new Point(-6000, -6000) };
+                form.Show();
+                using var bitmap = new Bitmap(form.Width, form.Height);
+                form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size));
+                bitmap.Save(Path.ChangeExtension(path, ".practice.png"));
             }
             if (!startCar)
             {

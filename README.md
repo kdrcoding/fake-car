@@ -19,6 +19,24 @@ Use it to learn E-Sys, try a coding tool before it touches a real car, or record
 
 Close the window and the car keeps running next to the clock: click the Fake Car icon there to open the window, stop the car or quit. Everything you change stays for next time. Tick **Start fresh** to go back to the car as it left the factory.
 
+## Practice
+
+Click **Practice** in the window to make the picked car misbehave on purpose, the way real cars do:
+
+| Problem | What E-Sys sees |
+|---|---|
+| A module does not answer | That module is silent, as if unplugged. |
+| Coding fails on a module | Coding writes to that module are refused. |
+| The connection drops during coding | The connection breaks once, at the third coding write. |
+| Low battery | The engine computer reports 11.4 V. |
+| Erase a module's coding data | The module shows `CAFD_FFFFFFFF`, as after a flash or with a new module. |
+
+To fix `CAFD_FFFFFFFF` in E-Sys, Expert Mode > Coding: **Read SVT**, click the module's line, press **Detect CAF for SWE** (under SVT Target), pick a CAFD, **OK**, then **Code**. Read the SVT again and the CAFD is back.
+
+**Save points** keep the car as it is (everything coded, flashed or written) so you can go back to it later, for example before trying a risky change or for a second take of a video. **Start fresh** still goes back to the car as it left the factory.
+
+A running car starts again by itself with your changes when you close the Practice window. Problems are kept in `problems.txt`, save points in `savepoints`, both in the car's folder.
+
 ## Options
 
 Click **Options** in the window (or in the icon's menu). Each choice works as soon as you tick it.
@@ -53,7 +71,7 @@ Options are kept in `%APPDATA%\FakeCar\options.txt`, so a newer Fake Car keeps t
 | Mileage kept in the modules (for used-car checks) | Every module, the body module backup and the cluster's two totals |
 | Module reset | Yes |
 
-Tested with E-Sys 25.10: connecting, reading and writing FA, FP and I-steps, SVT, coding, and FSC actions (status, VIN, SID on the head unit). TAL calculation works on F- and G-series cars (F30 practice car: the cluster is planned for flashing; G80: up to date, nothing to flash). Running a full flash (Execute) is not tested yet. ISTA finds cars the same way over the network, but it is not tested yet either.
+Tested with E-Sys 25.10: connecting, reading and writing FA, FP and I-steps, SVT, coding, and FSC actions (status, VIN, SID on the head unit). TAL calculation works on F- and G-series cars (F30 practice car: the cluster is planned for flashing; G80: up to date, nothing to flash). The CAFD_FFFFFFFF practice was fixed in E-Sys 25.10 with Detect CAF for SWE and Code. Running a full flash (Execute) is not tested yet. ISTA finds cars the same way over the network, but it is not tested yet either.
 
 ## Car models
 

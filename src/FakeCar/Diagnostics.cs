@@ -109,12 +109,31 @@ sealed class Diagnostics(Car car, Log log)
     {
         if (req.Length < 4) return [0x7F, 0x2E, IncorrectLength];
         var did = (ushort)(req[1] << 8 | req[2]);
+        if (car.CodingFails.Contains(ecu.Address) && !IsVcm(did))
+        {
+            log.Line($"  WRITE {ecu.Name} [{ecu.Address:X2}] DID {did:X4} refused (practice: coding fails here)");
+            return [0x7F, 0x2E, 0x72]; // general programming failure
+        }
         ecu.Dids[did] = req[3..];
         log.Line($"  WRITE {ecu.Name} [{ecu.Address:X2}] DID {did:X4} {req.Length - 3} bytes");
         car.Changed(ecu, did);
         // Coding from another CAFD (version) carries that CAFD's ID: the SVK shows the CAFD now in the module.
         if (ecu.TakeSoftware(req[3..])) SvkChanged(ecu);
         return [0x6E, req[1], req[2]];
+    }
+
+    static bool IsVcm(ushort did) => did is Dids.Fa or Dids.Fp or Dids.IStep;
+
+    int codingWrites;
+    bool dropped;
+
+    /// <summary>Practice: the connection drops once, at the third coding write (before it is answered).</summary>
+    public bool DropsHere(byte[] req)
+    {
+        if (!car.DropDuringCoding || dropped || req is not [0x2E, _, _, _, ..] || IsVcm((ushort)(req[1] << 8 | req[2]))) return false;
+        if (++codingWrites < 3) return false;
+        dropped = true;
+        return true;
     }
 
     // Flashing: RequestDownload, TransferData blocks, RequestTransferExit, like a module's flash loader.

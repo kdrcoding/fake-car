@@ -25,6 +25,9 @@ sealed class Ecu
     /// <summary>Enabling codes (FSC) by software ID (application number, upgrade index), as the module keeps them.</summary>
     public SortedDictionary<uint, byte[]> Fscs { get; } = [];
 
+    /// <summary>The CAFD entry (8 bytes) whose coding data was erased: the SVK shows CAFD_FFFFFFFF until it is coded again.</summary>
+    public byte[]? MissingCafd { get; set; }
+
     /// <summary>Modules that take enabling codes on F-series: the head unit and the instrument cluster.</summary>
     public bool TakesFsc => Name.StartsWith("HU", StringComparison.Ordinal) || Name.EndsWith("KOMBI", StringComparison.Ordinal);
     public long DownloadBytes { get; set; }
@@ -37,6 +40,23 @@ sealed class Ecu
     public bool TakeSoftware(IReadOnlyList<byte> data)
     {
         if (!Dids.TryGetValue(0xF101, out var svk) || svk.Length < 16) return false;
+        // Coding data erased: coding with that CAFD (any version) brings it back into the FFFFFFFF entry.
+        if (MissingCafd is { } want)
+        {
+            for (var i = 0; i + 8 <= data.Count; i++)
+            {
+                if (data[i] != want[0] || data[i + 1] != want[1] || data[i + 2] != want[2] || data[i + 3] != want[3] || data[i + 4] != want[4] || data[i + 5] == 0xFF) continue;
+                for (var e = 8; e + 8 <= svk.Length; e += 8)
+                {
+                    if (svk[e] != want[0] || svk[e + 1] != 0xFF || svk[e + 2] != 0xFF || svk[e + 3] != 0xFF || svk[e + 4] != 0xFF) continue;
+                    var coded = (byte[])svk.Clone();
+                    for (var k = 0; k < 8; k++) coded[e + k] = data[i + k];
+                    Dids[0xF101] = coded;
+                    MissingCafd = null;
+                    return true;
+                }
+            }
+        }
         for (var e = 8; e + 8 <= svk.Length; e += 8)
         {
             for (var i = 0; i + 8 <= data.Count; i++)
@@ -68,10 +88,22 @@ sealed class Car
     public Dictionary<byte, Ecu> Ecus { get; } = [];
     public byte Gateway => 0x10;
 
+    // Practice problems (problems.txt in the car folder, set in the Practice window).
+    /// <summary>Modules that do not answer at all, as if unplugged.</summary>
+    public HashSet<byte> Silent { get; } = [];
+    /// <summary>Modules that refuse coding writes.</summary>
+    public HashSet<byte> CodingFails { get; } = [];
+    /// <summary>The connection drops once, at the third coding write.</summary>
+    public bool DropDuringCoding { get; private set; }
+
     public static Car Load(string folder)
     {
         var settings = ReadSettings(Path.Combine(folder, "car.txt"));
         var car = new Car { Vin = settings["VIN"], Folder = folder };
+        var problems = Practice.Problems(folder);
+        car.Silent.UnionWith(Practice.Addresses(problems.GetValueOrDefault(Practice.SilentKey, "")));
+        car.CodingFails.UnionWith(Practice.Addresses(problems.GetValueOrDefault(Practice.CodingFailsKey, "")));
+        car.DropDuringCoding = problems.GetValueOrDefault(Practice.DropKey) == "1";
 
         foreach (var line in File.ReadAllLines(Path.Combine(folder, "modules.txt")))
         {
@@ -131,7 +163,8 @@ sealed class Car
         // Battery: voltage at the engine computer (mV) and its registered capacity (Ah).
         if (car.Ecus.TryGetValue(0x12, out var dme))
         {
-            var mv = int.Parse(settings.GetValueOrDefault("BATTERY_MV", "12580"), CultureInfo.InvariantCulture);
+            var mv = problems.GetValueOrDefault(Practice.LowBatteryKey) == "1" ? Practice.LowBatteryMv
+                : int.Parse(settings.GetValueOrDefault("BATTERY_MV", "12580"), CultureInfo.InvariantCulture);
             dme.Dids[0xF442] = [(byte)(mv >> 8), (byte)mv];
             dme.Dids[0x4023] = [byte.Parse(settings.GetValueOrDefault("BATTERY_AH", "90"), CultureInfo.InvariantCulture)];
         }
@@ -144,13 +177,40 @@ sealed class Car
         return car;
     }
 
-    string WrittenFolder => Path.Combine(Folder, "written");
+    string WrittenFolder => WrittenIn(Folder);
+
+    /// <summary>Where a car folder keeps what was written to the car (coding, flashed SVK, FA, FSC).</summary>
+    public static string WrittenIn(string folder) => Path.Combine(folder, "written");
 
     /// <summary>What was coded into the car stays coded after a restart (until "--fresh").</summary>
     public void Changed(Ecu ecu, ushort did)
     {
         Directory.CreateDirectory(WrittenFolder);
         File.WriteAllText(Path.Combine(WrittenFolder, $"{ecu.Address:X2}_{did:X4}.hex"), Convert.ToHexString(ecu.Dids[did]));
+        if (did != 0xF101) return;
+        var missing = Path.Combine(WrittenFolder, $"{ecu.Address:X2}_CAFD_MISSING.hex");
+        if (ecu.MissingCafd is { } entry) File.WriteAllText(missing, Convert.ToHexString(entry));
+        else File.Delete(missing);
+    }
+
+    /// <summary>
+    /// Erases a module's coding data, as after a flash or with a new module: its CAFD entry in the SVK becomes
+    /// FFFFFFFF (E-Sys shows CAFD_FFFFFFFF) until it is coded with that CAFD again. False when it has no CAFD.
+    /// </summary>
+    public bool EraseCafd(Ecu ecu)
+    {
+        if (!ecu.Dids.TryGetValue(0xF101, out var svk)) return false;
+        for (var e = 8; e + 8 <= svk.Length; e += 8)
+        {
+            if (svk[e] != 0x05 || svk[e + 1] == 0xFF) continue;
+            ecu.MissingCafd = svk[e..(e + 8)];
+            var erased = (byte[])svk.Clone();
+            for (var k = 1; k < 8; k++) erased[e + k] = 0xFF;
+            ecu.Dids[0xF101] = erased;
+            Changed(ecu, 0xF101);
+            return true;
+        }
+        return false;
     }
 
     public void FscChanged(Ecu ecu, uint swid)
@@ -164,6 +224,11 @@ sealed class Car
     void LoadWritten()
     {
         if (!Directory.Exists(WrittenFolder)) return;
+        foreach (var file in Directory.GetFiles(WrittenFolder, "*_CAFD_MISSING.hex"))
+        {
+            if (Ecus.TryGetValue(byte.Parse(Path.GetFileName(file)[..2], NumberStyles.HexNumber, CultureInfo.InvariantCulture), out var erased))
+                erased.MissingCafd = Convert.FromHexString(File.ReadAllText(file).Trim());
+        }
         foreach (var file in Directory.GetFiles(WrittenFolder, "*_FSC_*.hex"))
         {
             var p = Path.GetFileNameWithoutExtension(file).Split('_');

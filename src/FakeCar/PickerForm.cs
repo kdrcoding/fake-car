@@ -5,7 +5,13 @@ namespace FakeCar;
 /// <summary>The window: every car model in the cars folder, pick one and start it. Closing the window stops the car.</summary>
 sealed class PickerForm : Form
 {
-    sealed record Model(string Folder, string Name, string Vin, int Modules);
+    sealed record Model(string Folder, string Name, string Vin, int Modules, string Target)
+    {
+        /// <summary>"Running" line: how to find this car in E-Sys's Open Connection.</summary>
+        public string Connect => Target.Length > 0
+            ? $"pick the car by its VIN, or use the gateway URL tcp://127.0.0.1:6801 with target {Target}"
+            : "pick the car by its VIN, or use the gateway URL tcp://127.0.0.1:6801";
+    }
 
     readonly ListBox list = new() { Dock = DockStyle.Fill, DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = 46, BorderStyle = BorderStyle.None, IntegralHeight = false };
     readonly CheckBox fresh = new() { Text = "Start fresh (forget what was coded last time)", AutoSize = true };
@@ -174,7 +180,9 @@ sealed class PickerForm : Form
         if (!File.Exists(settingsFile) || (!File.Exists(modulesFile) && !File.Exists(Path.Combine(dir, "FA.xml")))) return null;
         var settings = Car.ReadSettings(settingsFile);
         var modules = File.Exists(modulesFile) ? File.ReadLines(modulesFile).Count(l => l.Length > 0 && !l.StartsWith('#')) : 0;
-        return new Model(dir, settings.GetValueOrDefault("NAME", Path.GetFileName(dir)), settings.GetValueOrDefault("VIN", ""), modules);
+        // The E-Sys target is the PSdZData project of the car's I-step: F020-26-07-530 is F020_26_07_530_...
+        var target = settings.GetValueOrDefault("ISTEP_CURRENT", "").Replace('-', '_');
+        return new Model(dir, settings.GetValueOrDefault("NAME", Path.GetFileName(dir)), settings.GetValueOrDefault("VIN", ""), modules, target);
     }
 
     void DrawModel(object? sender, DrawItemEventArgs e)
@@ -187,7 +195,7 @@ sealed class PickerForm : Form
         using var bold = new Font(Font, FontStyle.Bold);
         var line = m.Name + (m == runningModel ? "   (running)" : "");
         TextRenderer.DrawText(e.Graphics, line, bold, new Point(e.Bounds.X + 8, e.Bounds.Y + 5), list.ForeColor);
-        var detail = m.Modules > 0 ? $"VIN {m.Vin}   {m.Modules} modules" : $"VIN {m.Vin}   built from your PSdZData on first start";
+        var detail = m.Modules > 0 ? $"VIN {m.Vin}   {m.Modules} modules" + (m.Target.Length > 0 ? $"   target {m.Target}" : "") : $"VIN {m.Vin}   built from your PSdZData on first start";
         TextRenderer.DrawText(e.Graphics, detail, Font, new Point(e.Bounds.X + 8, e.Bounds.Y + 24), SystemColors.GrayText);
     }
 
@@ -270,7 +278,7 @@ sealed class PickerForm : Form
             return;
         }
         start.Text = Selected == runningModel ? "Stop" : "Switch";
-        status.Text = $"Running: {runningModel.Name}. In E-Sys, Open Connection and pick the car by its VIN, or use the gateway URL tcp://127.0.0.1:6801.";
+        status.Text = $"Running: {runningModel.Name}. In E-Sys, Open Connection and {runningModel.Connect}.";
     }
 
     public void TakePicture(string path, bool startCar)

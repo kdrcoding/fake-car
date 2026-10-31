@@ -113,10 +113,21 @@ sealed class Car
         }
         gw.Dids[Dids.IStep] = IStepBytes(settings["ISTEP_CURRENT"], settings["ISTEP_LAST"], settings["ISTEP_SHIPMENT"]);
 
-        // Odometer in the gateway (and cluster): 3 bytes, km.
+        // Mileage: every module keeps its own copy (2540, 3 bytes, km), saved at intervals so it trails the real value a
+        // little; the body module has a backup (1700), the cluster a working and a stored total (D10D, 4 bytes each).
+        // KM_CLUSTER makes the cluster show other km than the rest of the car keeps: a rolled-back car to practise on.
         var km = int.Parse(settings.GetValueOrDefault("KM", "48312"), CultureInfo.InvariantCulture);
-        foreach (var a in new byte[] { car.Gateway, 0x60 })
-            if (car.Ecus.TryGetValue(a, out var withKm)) withKm.Dids[0x2540] = [(byte)(km >> 16), (byte)(km >> 8), (byte)km];
+        var shown = int.Parse(settings.GetValueOrDefault("KM_CLUSTER", km.ToString(CultureInfo.InvariantCulture)), CultureInfo.InvariantCulture);
+        foreach (var ecu in car.Ecus.Values)
+            ecu.Dids[0x2540] = Km3(ecu.Address == car.Gateway ? km : Math.Max(0, km - ecu.Address * 53 % 180));
+        if (car.Ecus.TryGetValue(0x40, out var bodyKm)) bodyKm.Dids[0x1700] = Km3(Math.Max(0, km - 40));
+        if (car.Ecus.TryGetValue(0x60, out var cluster))
+        {
+            var stored = shown / 10 * 10;
+            cluster.Dids[0x2540] = Km3(shown);
+            cluster.Dids[0xD10D] = [(byte)(shown >> 24), (byte)(shown >> 16), (byte)(shown >> 8), (byte)shown,
+                (byte)(stored >> 24), (byte)(stored >> 16), (byte)(stored >> 8), (byte)stored];
+        }
         // Battery: voltage at the engine computer (mV) and its registered capacity (Ah).
         if (car.Ecus.TryGetValue(0x12, out var dme))
         {
@@ -214,6 +225,8 @@ sealed class Car
         // Coding stamp: the last 7 of the VIN this module was coded on.
         ecu.Dids.TryAdd(0x37FE, [.. vin[^7..], 0x00, 0x00]);
     }
+
+    static byte[] Km3(int km) => [(byte)(km >> 16), (byte)(km >> 8), (byte)km];
 
     /// <summary>A VCM record: 2-byte length, the data (no signature part).</summary>
     static byte[] VcmRecord(byte[] data) => [(byte)(data.Length >> 8), (byte)data.Length, .. data];

@@ -14,7 +14,7 @@ Use it to learn E-Sys, try a coding tool before it touches a real car, or record
 2. Start `FakeCar.exe`, pick a car, press **Start**. The first start of a car builds it from your PSdZData (about half a minute, once).
 3. In E-Sys, click **Open Connection** and either
    - pick the Fake Car by its VIN under **Connection via VIN**, or
-   - choose **Connection via gateway URL**, enter `tcp://127.0.0.1:6801`, pick the target for that car's series (F010, F020, S15A or S18A), and tick **Read parameters from VCM**.
+   - choose **Connection via gateway URL**, enter `tcp://127.0.0.1:6801`, pick the target the Fake Car window shows for the running car (for example `F020_26_07_530` for the F30), and tick **Read parameters from VCM**. A target of another series connects too, but E-Sys's TAL calculation then stops with a PSdZ error ("DetailInfo must not be null").
 4. Work as you would with a real car.
 
 Close the window to switch the car off. Everything you change stays for next time. Tick **Start fresh** to go back to the car as it left the factory.
@@ -36,9 +36,10 @@ Close the window to switch the car off. Everything you change stays for next tim
 | Flash software | Yes, the module reports the new version |
 | FSC codes (store, read, check, cancel) | Head unit and instrument cluster, F-series cars (G-series use SFA, which needs BMW's backend) |
 | Read and clear fault memory | Yes |
+| Mileage kept in the modules (for used-car checks) | Every module, the body module backup and the cluster's two totals |
 | Module reset | Yes |
 
-Tested with E-Sys 25.10: connecting, reading and writing FA, FP and I-steps, SVT, coding, and FSC actions (status, VIN, SID on the head unit). Flash planning finds the out-of-date module, but on this test PC E-Sys's TAL calculation currently stops with a PSdZ error, so a full flash run is not tested. ISTA finds cars the same way over the network, but it is not tested yet either.
+Tested with E-Sys 25.10: connecting, reading and writing FA, FP and I-steps, SVT, coding, and FSC actions (status, VIN, SID on the head unit). TAL calculation works on F- and G-series cars (F30 practice car: the cluster is planned for flashing; G80: up to date, nothing to flash). Running a full flash (Execute) is not tested yet. ISTA finds cars the same way over the network, but it is not tested yet either.
 
 ## Car models
 
@@ -64,7 +65,7 @@ Each car is built on your own PC from your own PSdZData, the way the factory put
 
 <img src="docs/esys-flash.png" alt="E-Sys TAL-Calculating with the Fake Car: the instrument cluster is marked for flashing" width="768">
 
-Use the **F30 340i with old cluster software**: its instrument cluster still has the software it was built with. Flash planning works on F-series cars; on G-series cars E-Sys's TAL calculation does not finish yet.
+Use the **F30 340i with old cluster software**: its instrument cluster still has the software it was built with. Connect with the target the Fake Car window shows (F020_26_07_530 for this car).
 
 1. **Comfort Mode > TAL-Calculating**.
 2. Vehicle Order: **Read**. SVT Actual: **Read (ECU) without smart actuators**.
@@ -87,9 +88,11 @@ Save your car's vehicle order in E-Sys (**Expert Mode > VCM**, **Read**, then **
 Copy a car folder and change two files:
 
 - `FA.xml`: the vehicle order. `typeKey` (type key), `series` (development series, for example F030 for an F30), `timeCriteria` (MMYY), the SA codes.
-- `car.txt`: name, a made-up VIN with a valid check digit, mileage, battery. The I-steps (`ISTEP_SHIPMENT`, `ISTEP_LAST`, `ISTEP_CURRENT`) are optional: without them the builder takes them from your PSdZData and writes them in.
+- `car.txt`: name, a made-up VIN with a valid check digit, mileage (`KM`), battery. The I-steps (`ISTEP_SHIPMENT`, `ISTEP_LAST`, `ISTEP_CURRENT`) are optional: without them the builder takes them from your PSdZData and writes them in.
 
 `faults.txt` lists the faults it has stored (module address, fault code, status, count, km).
+
+To practise spotting a rolled-back car, add `KM_CLUSTER=30000` to `car.txt`: the instrument cluster shows 30,000 km while the other modules keep the real `KM`.
 
 To have something to flash, add `OUTDATED=60` (module addresses, comma separated) to `car.txt`: those modules keep the software they were built with.
 

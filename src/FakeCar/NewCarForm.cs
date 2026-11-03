@@ -6,7 +6,7 @@ namespace FakeCar;
 /// Add a car: pick a series and a model from the PSdZData in use (or choose other PSdZData), the build date and a name.
 /// The new car folder gets a vehicle order with base equipment and a made-up VIN; it is built afterwards.
 /// </summary>
-sealed class NewCarForm : Form
+sealed class NewCarForm : Window
 {
     /// <summary>The new car folder, once Add car was pressed.</summary>
     public string? Folder { get; private set; }

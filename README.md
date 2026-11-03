@@ -6,7 +6,7 @@ Use it to learn E-Sys, try a coding tool before it touches a real car, or record
 
 **[Download the latest version](https://github.com/kdrcoding/fake-car/releases/latest)** · Free · Windows 10 and 11 · 11 car models · by [esysmax](https://esysmax.com)
 
-<img src="docs/fake-car-window.png" alt="The Fake Car window: a G80 M3 running, a tester connected from this PC" width="496">
+<img src="docs/fake-car-window.png" alt="The Fake Car window: an F30 running, a tester connected from this PC" width="496">
 
 ## Quick start
 
@@ -61,7 +61,7 @@ Close the window and the car keeps running. Click the Fake Car icon next to the 
 
 <table>
 <tr>
-<td width="50%" valign="top"><img src="docs/clock-menu.png" alt="The Fake Car icon's menu: Open Fake Car, Stop the car, Open the car's log, Options, Quit" width="361"></td>
+<td width="50%" valign="top"><img src="docs/clock-menu.png" alt="The Fake Car icon's menu: Open Fake Car, Stop the car, Open the car's log, Options, Quit" width="274"></td>
 <td width="50%" valign="top"><img src="docs/options.png" alt="Fake Car options" width="400"></td>
 </tr>
 <tr>
@@ -147,7 +147,7 @@ Use the **F30 340i with old cluster software**: its instrument cluster still has
 
 Click **Add a car**. Pick the **Series** (F30, G80, X5...) and the **Model** from the list your PSdZData has, with its engine, drive, market and the years it was made. Pick when it was **Built** (only dates that car was really made are offered) and press **Add car**. Fake Car makes it with base equipment and a made-up VIN and builds it straight away. **Choose...** next to PSdZData picks other PSdZData, old or new.
 
-<img src="docs/add-car.png" alt="Add a car: series F30, the 340i model, built 11/2015" width="560">
+<img src="docs/add-car.png" alt="Add a car: series F30, a B58 model, built 11/2015" width="560">
 
 Building shows how far it is, so you can see it working. Starting PSdZ is the slow part, mostly the first time.
 

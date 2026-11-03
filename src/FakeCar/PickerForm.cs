@@ -6,7 +6,7 @@ namespace FakeCar;
 /// The window: every car model in the cars folder, pick one and start it. The Fake Car icon next to the clock opens it,
 /// stops the car or quits; closing the window while a car runs keeps the car running there (Options).
 /// </summary>
-sealed class PickerForm : Form
+sealed class PickerForm : Window
 {
     sealed record Model(string Folder, string Name, string Vin, int Modules, string Target)
     {
@@ -48,7 +48,6 @@ sealed class PickerForm : Form
         this.carsFolder = carsFolder;
         allowShow = !background;
         Text = $"Fake Car {Version} by esysmax";
-        Icon = AppIcon(32);
         Font = new Font("Segoe UI", 9.5f);
         ClientSize = new Size(480, 384);
         MinimumSize = new Size(420, 300);
@@ -102,6 +101,7 @@ sealed class PickerForm : Form
         if (showEvent is not null)
         {
             tray = new NotifyIcon { Icon = AppIcon(16), ContextMenuStrip = new ContextMenuStrip(), Visible = true };
+            Look.Menu(tray.ContextMenuStrip);
             tray.ContextMenuStrip.Opening += (_, _) => FillMenu(tray.ContextMenuStrip);
             tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) ShowWindow(); };
             tray.BalloonTipClicked += (_, _) => ShowWindow();
@@ -127,11 +127,7 @@ sealed class PickerForm : Form
         Shown += async (_, _) => await CheckForUpdate();
     }
 
-    static Icon AppIcon(int size)
-    {
-        using var stream = typeof(PickerForm).Assembly.GetManifestResourceStream("FakeCar.fakecar.ico");
-        return stream is null ? SystemIcons.Application : new Icon(stream, new Size(size, size));
-    }
+    static Icon AppIcon(int size) => Look.Icon(size);
 
     /// <summary>The icon's menu, made fresh each time it opens so it shows what runs now.</summary>
     void FillMenu(ContextMenuStrip menu)
@@ -276,12 +272,14 @@ sealed class PickerForm : Form
         }
     }
 
+    static string AboutText => $"Fake Car {Version}\nby esysmax (esysmax.com)\n\nA pretend BMW for E-Sys: read and write the vehicle order, code, flash and read faults without a real car. Every VIN is made up.\n\n"
+        + "Free to use and to share unchanged. Changed versions may not be shared, and the \"by esysmax\" credit must stay.\n\n"
+        + "Not made by or connected with BMW AG.";
+
     void ShowAbout()
     {
-        var text = $"Fake Car {Version}\nby esysmax (esysmax.com)\n\nA pretend BMW for E-Sys: read and write the vehicle order, code, flash and read faults without a real car. Every VIN is made up.\n\n"
-            + "Free to use and to share unchanged. Changed versions may not be shared, and the \"by esysmax\" credit must stay.\n\n"
-            + "Not made by or connected with BMW AG.\n\nOpen the Fake Car page on GitHub?";
-        if (MessageBox.Show(this, text, "About Fake Car", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes) Open(Page);
+        using var box = new AboutForm(AboutText);
+        if (box.ShowDialog(this) == DialogResult.Yes) Open(Page);
     }
 
     static void Open(string url)
@@ -385,13 +383,18 @@ sealed class PickerForm : Form
         if (e.Index < 0) return;
         var m = (Model)list.Items[e.Index];
         var selected = (e.State & DrawItemState.Selected) != 0;
-        using var back = new SolidBrush(selected ? Color.FromArgb(229, 239, 252) : list.BackColor);
+        using var back = new SolidBrush(selected ? Look.Picked : list.BackColor);
         e.Graphics.FillRectangle(back, e.Bounds);
+        if (selected)
+        {
+            using var mark = new SolidBrush(Look.Accent);
+            e.Graphics.FillRectangle(mark, e.Bounds.X, e.Bounds.Y, 3, e.Bounds.Height);
+        }
         using var bold = new Font(Font, FontStyle.Bold);
         var line = m.Name + (m == runningModel ? "   (running)" : "");
         TextRenderer.DrawText(e.Graphics, line, bold, new Point(e.Bounds.X + 8, e.Bounds.Y + 5), list.ForeColor);
         var detail = m.Modules > 0 ? $"VIN {m.Vin}   {m.Modules} modules" + (m.Target.Length > 0 ? $"   target {m.Target}" : "") : $"VIN {m.Vin}   built from your PSdZData on first start";
-        TextRenderer.DrawText(e.Graphics, detail, Font, new Point(e.Bounds.X + 8, e.Bounds.Y + 24), SystemColors.GrayText);
+        TextRenderer.DrawText(e.Graphics, detail, Font, new Point(e.Bounds.X + 8, e.Bounds.Y + 24), Look.Muted);
     }
 
     Model? Selected => list.SelectedItem as Model;
@@ -440,9 +443,9 @@ sealed class PickerForm : Form
     bool building;
 
     // The building screen over the car list: what the builder does now, and how far it is.
-    readonly Panel buildScreen = new() { Dock = DockStyle.Fill, Visible = false, BackColor = SystemColors.Window, Padding = new Padding(22, 40, 22, 0) };
+    readonly Panel buildScreen = new() { Dock = DockStyle.Fill, Visible = false, BackColor = Look.Page, Padding = new Padding(22, 40, 22, 0) };
     readonly Label buildTitle = new() { Dock = DockStyle.Top, Height = 30, Font = new Font("Segoe UI Semibold", 11f), AutoEllipsis = true };
-    readonly ProgressBar buildBar = new() { Dock = DockStyle.Top, Height = 14, Maximum = 1000, Style = ProgressBarStyle.Continuous };
+    readonly Bar buildBar = new() { Dock = DockStyle.Top, Height = 6, Maximum = 1000 };
     readonly Label buildStep = new() { Dock = DockStyle.Top, Height = 44, Padding = new Padding(0, 8, 0, 0), AutoEllipsis = true };
     readonly Label buildNote = new() { Dock = DockStyle.Top, Height = 40, ForeColor = SystemColors.GrayText, Text = "This happens once per car. E-Sys can stay open." };
     readonly System.Windows.Forms.Timer buildTimer = new() { Interval = 150 };
@@ -571,6 +574,13 @@ sealed class PickerForm : Form
                 form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size));
                 bitmap.Save(Path.ChangeExtension(path, ".practice.png"));
             }
+            using (var form = new AboutForm(AboutText) { StartPosition = FormStartPosition.Manual, Location = new Point(-6000, -6000) })
+            {
+                form.Show();
+                using var bitmap = new Bitmap(form.Width, form.Height);
+                form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size));
+                bitmap.Save(Path.ChangeExtension(path, ".about.png"));
+            }
             // Add a car with the F30 picked; FAKECAR_PICTURE_ADD=1 also adds it, so the car started below is that one.
             try
             {
@@ -605,6 +615,7 @@ sealed class PickerForm : Form
                 Save(Path.ChangeExtension(path, ".connected.png"));
                 // The clock icon's menu, as it shows with this car running.
                 using var menu = new ContextMenuStrip();
+                Look.Menu(menu);
                 FillMenu(menu);
                 menu.Show(new Point(-6000, -6000));
                 using var shot = new Bitmap(menu.Width, menu.Height);
@@ -651,5 +662,36 @@ sealed class PickerForm : Form
             tray.Dispose();
         }
         base.OnFormClosed(e);
+    }
+}
+
+/// <summary>About Fake Car, in the window's own look.</summary>
+sealed class AboutForm : Window
+{
+    public AboutForm(string text)
+    {
+        Text = "About Fake Car";
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        MaximizeBox = false;
+        MinimizeBox = false;
+        ShowInTaskbar = false;
+        StartPosition = FormStartPosition.CenterParent;
+        AutoSize = true;
+        AutoSizeMode = AutoSizeMode.GrowAndShrink;
+
+        var logo = new PictureBox { Image = Look.Icon(256).ToBitmap(), SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(56, 56), Margin = new Padding(16, 18, 4, 0) };
+        var words = new Label { Text = text, AutoSize = true, MaximumSize = new Size(400, 0), Margin = new Padding(8, 18, 18, 8) };
+        var top = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+        top.Controls.AddRange([logo, words]);
+        var page = new Button { Text = "Open the GitHub page", AutoSize = true, Height = 30, DialogResult = DialogResult.Yes, Margin = new Padding(0, 0, 8, 0), Padding = new Padding(8, 0, 8, 0) };
+        var close = new Button { Text = "Close", Width = 90, Height = 30, DialogResult = DialogResult.No, Margin = Padding.Empty };
+        var bottom = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Dock = DockStyle.Fill, Padding = new Padding(0, 4, 18, 14), Margin = Padding.Empty };
+        bottom.Controls.AddRange([close, page]);
+        var all = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Margin = Padding.Empty };
+        all.Controls.Add(top);
+        all.Controls.Add(bottom);
+        Controls.Add(all);
+        AcceptButton = page;
+        CancelButton = close;
     }
 }

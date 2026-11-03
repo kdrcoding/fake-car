@@ -83,7 +83,7 @@ static class Options
 }
 
 /// <summary>The Options window: every choice takes effect as soon as it is ticked.</summary>
-sealed class OptionsForm : Form
+sealed class OptionsForm : Window
 {
     public OptionsForm()
     {

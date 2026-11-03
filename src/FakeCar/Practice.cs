@@ -91,7 +91,7 @@ static class Practice
 /// The Practice window for one car: problems to practise on, erasing a module's coding data (CAFD_FFFFFFFF), and save
 /// points. <see cref="Changed"/> tells the main window to start a running car again with the changes.
 /// </summary>
-sealed class PracticeForm : Form
+sealed class PracticeForm : Window
 {
     readonly string folder;
     readonly Car car;

@@ -28,8 +28,13 @@ sealed class Ecu
     /// <summary>The CAFD entry (8 bytes) whose coding data was erased: the SVK shows CAFD_FFFFFFFF until it is coded again.</summary>
     public byte[]? MissingCafd { get; set; }
 
-    /// <summary>Modules that take enabling codes on F-series: the head unit and the instrument cluster.</summary>
-    public bool TakesFsc => Name.StartsWith("HU", StringComparison.Ordinal) || Name.EndsWith("KOMBI", StringComparison.Ordinal);
+    /// <summary>
+    /// Modules that take enabling codes: the head unit, the instrument cluster (KOMBI, G-series DKOMBI2 / IC_MID) and the
+    /// engine computer (DME/DDE). Owner's test 2026-11-03: an FSC upgrade at a G30's DME_BAC2 was turned away as out of range.
+    /// </summary>
+    public bool TakesFsc => Name.StartsWith("HU", StringComparison.Ordinal) || Name.Contains("KOMBI", StringComparison.Ordinal)
+        || Name.StartsWith("IC_", StringComparison.Ordinal)
+        || Name.StartsWith("DME", StringComparison.Ordinal) || Name.StartsWith("DDE", StringComparison.Ordinal);
     public long DownloadBytes { get; set; }
 
     /// <summary>

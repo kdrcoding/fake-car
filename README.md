@@ -76,7 +76,7 @@ Close the window and the car keeps running. Click the Fake Car icon next to the 
 | Start the last car when Fake Car opens | The car you used last starts by itself. |
 | Start Fake Car with Windows | Fake Car starts next to the clock, without the window, with the last car on. |
 | Tell me when a tester connects | A short note next to the clock while the window is closed. The window always shows it. |
-| Let other PCs on the network connect | On by default. Off: only E-Sys on this PC can connect, with the gateway URL `tcp://127.0.0.1:6801`. |
+| Let other PCs on the network connect | On by default. Off: only E-Sys on this PC finds and connects to the car (by its VIN or with the gateway URL `tcp://127.0.0.1:6801`); other PCs are turned away. |
 | PSdZData folder | The PSdZData the cars are built from. Automatic: the one E-Sys uses. Choose another, older or newer: the cars are built again from it on their next start. |
 | E-Sys folder | The E-Sys the builder runs with. Automatic: the newest found. |
 
@@ -191,7 +191,7 @@ Every request and answer is written to `fakecar.log` in the car's folder.
 - Fake Car checks GitHub for a newer version when it starts and shows a link if there is one. Nothing is downloaded by itself. **About** shows the version.
 
 - One tester at a time, like the real central gateway.
-- Windows may ask about network access the first time. Other PCs only reach the car if you allow it; E-Sys on the same PC can always use the gateway URL.
+- Windows may ask about network access the first time. Other PCs only reach the car if you allow it and **Let other PCs on the network connect** is on; E-Sys on the same PC always finds it.
 - Windows may warn about an app from the internet on the first start: **More info**, then **Run anyway**.
 - No BMW data is in this repository. The car data is made on your PC from the PSdZData you already have.
 

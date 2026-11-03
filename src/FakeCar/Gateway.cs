@@ -24,9 +24,12 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, 
 
     public async Task RunAsync(CancellationToken stop)
     {
-        var listener = new TcpListener(bind, DiagPort);
+        // E-Sys finds a car by a broadcast search and connects to the address the answer came from, and Windows never
+        // hands a broadcast to a socket on 127.0.0.1 only: with "other PCs" off, E-Sys found no car (2026-11-03). So the car
+        // listens on every address of this PC and, with other PCs off, answers and serves only this PC.
+        var listener = new TcpListener(ListenOn, DiagPort);
         listener.Start();
-        log.Line($"listening tcp {bind}:{DiagPort}, VIN {car.Vin}, {car.Ecus.Count} modules");
+        log.Line($"listening tcp {Where}:{DiagPort}, VIN {car.Vin}, {car.Ecus.Count} modules");
         _ = Task.Run(() => SearchAsync(stop), stop);
         using var reg = stop.Register(listener.Stop);
         while (!stop.IsCancellationRequested)
@@ -34,6 +37,13 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, 
             TcpClient client;
             try { client = await listener.AcceptTcpClientAsync(stop); }
             catch (Exception) when (stop.IsCancellationRequested) { break; }
+            if (OnlyThisPc && client.Client.RemoteEndPoint is IPEndPoint other && !FromThisPc(other.Address))
+            {
+                log.Line($"tester {other} from another PC refused (other PCs are off in Options)");
+                client.Client.LingerState = new LingerOption(true, 0);
+                client.Close();
+                continue;
+            }
             lock (busy)
             {
                 if (tester is not null)
@@ -136,6 +146,18 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, 
         await stream.WriteAsync(frame, stop);
     }
 
+    /// <summary>Other PCs off (Options): <see cref="bind"/> is 127.0.0.1, the car listens everywhere but serves this PC only.</summary>
+    bool OnlyThisPc => IPAddress.IsLoopback(bind);
+
+    IPAddress ListenOn => OnlyThisPc ? IPAddress.Any : bind;
+
+    string Where => OnlyThisPc ? "0.0.0.0 (this PC only)" : bind.ToString();
+
+    /// <summary>One of this PC's own addresses: a broadcast search leaves from a network card's address, not 127.0.0.1.</summary>
+    static bool FromThisPc(IPAddress sender) =>
+        IPAddress.IsLoopback(sender) || System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+            .SelectMany(card => card.GetIPProperties().UnicastAddresses).Any(own => own.Address.Equals(sender));
+
     /// <summary>"DIAGADR10BMWMAC" + MAC + "BMWVIN" + VIN, as the gateway answers the vehicle search.</summary>
     byte[] Identification() => Encoding.ASCII.GetBytes($"DIAGADR{car.Gateway:X2}BMWMAC001A37DEC550BMWVIN{car.Vin}");
 
@@ -143,8 +165,8 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, 
     {
         using var udp = new UdpClient(AddressFamily.InterNetwork);
         udp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-        udp.Client.Bind(new IPEndPoint(bind, SearchPort));
-        log.Line($"listening udp {bind}:{SearchPort} (vehicle search)");
+        udp.Client.Bind(new IPEndPoint(ListenOn, SearchPort));
+        log.Line($"listening udp {Where}:{SearchPort} (vehicle search)");
         while (!stop.IsCancellationRequested)
         {
             UdpReceiveResult got;
@@ -152,6 +174,7 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, 
             catch (Exception) when (stop.IsCancellationRequested) { break; }
             catch (SocketException) { continue; }
             if (got.Buffer.Length < 6 || BinaryPrimitives.ReadUInt16BigEndian(got.Buffer.AsSpan(4)) != ControlIdent) continue;
+            if (OnlyThisPc && !FromThisPc(got.RemoteEndPoint.Address)) continue;
             var payload = Identification();
             var frame = new byte[6 + payload.Length];
             BinaryPrimitives.WriteInt32BigEndian(frame, payload.Length);

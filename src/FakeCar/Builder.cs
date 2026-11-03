@@ -1,12 +1,50 @@
 using System.Diagnostics;
-using System.Text;
 
 namespace FakeCar;
 
 /// <summary>Runs the car builder (builder\build-car.cmd) with the E-Sys and PSdZData found on this PC, without a window.</summary>
 static class Builder
 {
-    public static async Task<(bool Ok, string Message)> Build(string carFolder)
+    /// <param name="progress">How far the build is (percent, what it does now), from the builder's "Progress:" lines.</param>
+    public static async Task<(bool Ok, string Message)> Build(string carFolder, Action<int, string>? progress = null)
+    {
+        var lines = new List<string>();
+        var (ok, problem) = await Run(carFolder, line =>
+        {
+            if (line.StartsWith("Progress: ", StringComparison.Ordinal))
+            {
+                var p = line["Progress: ".Length..].Split(' ', 2);
+                if (int.TryParse(p[0], out var percent)) progress?.Invoke(percent, p.Length > 1 ? p[1] : "");
+            }
+            // The builder's own lines (PSdZ's logging goes to the log, not here).
+            else if (!line.StartsWith("WARNING", StringComparison.Ordinal) && !line.Contains('[', StringComparison.Ordinal)) lines.Add(line);
+        });
+        if (problem is not null) return (false, problem);
+        var last = lines.LastOrDefault() ?? "";
+        return (ok, ok ? last : last.Length > 0 ? last : "the builder stopped.");
+    }
+
+    /// <summary>A car type in the PSdZData: body series (F30), type key (8B33), what KIS says about it and when it was made (YYYY-MM).</summary>
+    public sealed record CarType(string Family, string Series, string Key, string Body, string Engine, string Cc, string Drive, string Market, string Steering, string From, string Until);
+
+    /// <summary>Every car type in the PSdZData in use, and each I-step family's I-step months (YY-MM): the build dates PSdZ takes.</summary>
+    public static async Task<(List<CarType> Types, Dictionary<string, string[]> Months, string? Problem)> Types()
+    {
+        var types = new List<CarType>();
+        var months = new Dictionary<string, string[]>();
+        var failed = "";
+        var (ok, problem) = await Run("--types", line =>
+        {
+            var p = line.Split('\t');
+            if (p[0] == "type" && p.Length >= 12) types.Add(new CarType(p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11]));
+            else if (p[0] == "istep" && p.Length >= 3) months[p[1]] = p[2].Split(',');
+            else if (line.StartsWith("Failed: ", StringComparison.Ordinal)) failed = line["Failed: ".Length..];
+        });
+        return (types, months, problem ?? (ok ? null : failed.Length > 0 ? failed : "the builder stopped."));
+    }
+
+    /// <summary>build-car.cmd with this PC's E-Sys and PSdZData, each output line handed over as it comes (on the caller's thread).</summary>
+    static async Task<(bool Ok, string? Problem)> Run(string first, Action<string> line)
     {
         var script = new[] { Path.Combine(AppContext.BaseDirectory, "builder", "build-car.cmd"), Path.Combine(AppContext.BaseDirectory, "..", "builder", "build-car.cmd") }
             .Select(Path.GetFullPath).FirstOrDefault(File.Exists);
@@ -17,7 +55,7 @@ static class Builder
 
         // cmd /s /c "<whole line>": the outer quotes are the only ones cmd takes off, so paths with spaces (Fake Car in
         // "C:\Users\John Doe\Downloads", E-Sys in "C:\EC-Apps\ESG\E-Sys 25.10") keep theirs. Windows paths hold no quotes.
-        var start = new ProcessStartInfo("cmd.exe", $"/s /c \"\"{script}\" \"{carFolder}\" \"{esys}\" \"{data}\"\"")
+        var start = new ProcessStartInfo("cmd.exe", $"/s /c \"\"{script}\" \"{first}\" \"{esys}\" \"{data}\"\"")
         {
             CreateNoWindow = true,
             UseShellExecute = false,
@@ -25,14 +63,14 @@ static class Builder
             RedirectStandardError = true,
         };
         using var process = Process.Start(start)!;
-        var said = new StringBuilder();
-        var output = process.StandardOutput.ReadToEndAsync();
         _ = process.StandardError.ReadToEndAsync();
+        while (await process.StandardOutput.ReadLineAsync() is { } text)
+        {
+            // Not Trim(): a type line may end in an empty field (a tab).
+            if (text.Trim().Length > 0) line(text.TrimEnd('\r').TrimStart());
+        }
         await process.WaitForExitAsync();
-        // The builder's own lines (PSdZ's logging goes to the log, not here).
-        var last = (await output).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(l => !l.StartsWith("WARNING", StringComparison.Ordinal) && !l.Contains('[', StringComparison.Ordinal)).LastOrDefault() ?? "";
-        return (process.ExitCode == 0, process.ExitCode == 0 ? last : $"{last} (exit {process.ExitCode})");
+        return (process.ExitCode == 0, null);
     }
 
     static (string? Esys, string Data)? folders;

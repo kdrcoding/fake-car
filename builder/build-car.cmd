@@ -3,6 +3,7 @@ setlocal
 rem Builds a Fake Car folder from your own E-Sys and PSdZData (no car, no window).
 rem   build-car.cmd <car folder> [E-Sys folder] [PSdZData parent folder]
 rem   build-car.cmd ..\cars\F30_340i_US C:\EC-Apps\E-Sys C:\Data
+rem   build-car.cmd --types C:\EC-Apps\E-Sys C:\Data
 rem The car folder needs car.txt and FA.xml; everything else is written by the builder.
 
 if "%~1"=="" (
@@ -10,6 +11,8 @@ if "%~1"=="" (
   exit /b 2
 )
 set "CAR=%~f1"
+rem --types instead of a car folder lists every car type in the PSdZData (Fake Car's Add a car window).
+if "%~1"=="--types" set "CAR=--types"
 set "ESYS=%~2"
 if "%ESYS%"=="" set "ESYS=C:\EC-Apps\E-Sys"
 set "DATA=%~3"

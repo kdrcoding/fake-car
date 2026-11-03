@@ -20,7 +20,7 @@ sealed class PickerForm : Form
     readonly CheckBox fresh = new() { Text = "Start fresh (forget what was coded last time)", AutoSize = true };
     readonly Button start = new() { Text = "Start", Width = 110, Height = 32 };
     readonly Label status = new() { Dock = DockStyle.Fill, AutoEllipsis = true, ForeColor = SystemColors.GrayText };
-    readonly LinkLabel addCar = new() { Text = "Add your own car", AutoSize = true, Margin = new Padding(0, 0, 14, 0) };
+    readonly LinkLabel addCar = new() { Text = "Add a car", AutoSize = true, Margin = new Padding(0, 0, 14, 0) };
     readonly LinkLabel practice = new() { Text = "Practice", AutoSize = true, Margin = new Padding(0, 0, 14, 0) };
     readonly LinkLabel options = new() { Text = "Options", AutoSize = true, Margin = new Padding(0, 0, 14, 0) };
     readonly LinkLabel about = new() { Text = "About", AutoSize = true, Margin = new Padding(0, 0, 14, 0) };
@@ -63,7 +63,7 @@ sealed class PickerForm : Form
         list.DoubleClick += async (_, _) => await StartSelected();
         start.Click += async (_, _) => await Toggle();
 
-        addCar.LinkClicked += (_, _) => AddOwnCar();
+        addCar.LinkClicked += async (_, _) => await AddCar();
         practice.LinkClicked += async (_, _) => await ShowPractice();
         options.LinkClicked += (_, _) => ShowOptions();
         about.LinkClicked += (_, _) => ShowAbout();
@@ -93,6 +93,7 @@ sealed class PickerForm : Form
         header.Controls.Add(byline);
         var listHolder = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 4, 12, 0) };
         listHolder.Controls.Add(list);
+        SetUpBuildScreen(listHolder);
         Controls.Add(listHolder);
         Controls.Add(bottom);
         Controls.Add(header);
@@ -289,6 +290,29 @@ sealed class PickerForm : Form
         catch (Exception) { }
     }
 
+    /// <summary>Add a car: picked from the PSdZData (built straight away), or from a vehicle order saved in E-Sys.</summary>
+    async Task AddCar()
+    {
+        string? folder;
+        bool saved;
+        using (var form = new NewCarForm(carsFolder))
+        {
+            form.ShowDialog(this);
+            folder = form.Folder;
+            saved = form.UseSavedOrder;
+        }
+        if (saved)
+        {
+            AddOwnCar();
+            return;
+        }
+        if (folder is null || ModelIn(folder) is not { } m) return;
+        list.Items.Add(m);
+        list.SelectedItem = m;
+        if (await Build(m) is { } built)
+            status.Text = runningModel is null ? $"{built.Name} is ready. Press Start." : $"{built.Name} is ready. Press Switch to change to it.";
+    }
+
     /// <summary>A new car folder from a vehicle order saved in E-Sys: its VIN is swapped for a made-up one, the I-steps come from your PSdZData.</summary>
     void AddOwnCar()
     {
@@ -319,7 +343,7 @@ sealed class PickerForm : Form
     }
 
     /// <summary>A VIN with a valid check digit that no real car has: "DEMC" stands where the model code would be.</summary>
-    static string MadeUpVin(string maker)
+    internal static string MadeUpVin(string maker)
     {
         int[] weights = [8, 7, 6, 5, 4, 3, 2, 10, 0, 9, 8, 7, 6, 5, 4, 3, 2];
         var vin = (maker + "DEMC5_LK" + Random.Shared.Next(100000, 999999)).ToCharArray();
@@ -348,7 +372,8 @@ sealed class PickerForm : Form
         if (!File.Exists(settingsFile) || (!File.Exists(modulesFile) && !File.Exists(Path.Combine(dir, "FA.xml")))) return null;
         var settings = Car.Settings(dir);
         var modules = File.Exists(modulesFile) ? File.ReadLines(modulesFile).Count(l => l.Length > 0 && !l.StartsWith('#')) : 0;
-        // Built from other PSdZData than the one in use now: it is built again on its next start.
+        // A build that never finished, or one from other PSdZData than the one in use now: it is built (again) on its next start.
+        if (File.Exists(Path.Combine(dir, "building.txt"))) modules = 0;
         if (settings.TryGetValue("DATA", out var data) && Builder.IsData(Builder.Folders().Data) && !Builder.SameFolder(data, Builder.Folders().Data)) modules = 0;
         // The E-Sys target is the PSdZData project of the car's I-step: F020-26-07-530 is F020_26_07_530_...
         var target = settings.GetValueOrDefault("ISTEP_CURRENT", "").Replace('-', '_');
@@ -414,18 +439,60 @@ sealed class PickerForm : Form
 
     bool building;
 
+    // The building screen over the car list: what the builder does now, and how far it is.
+    readonly Panel buildScreen = new() { Dock = DockStyle.Fill, Visible = false, BackColor = SystemColors.Window, Padding = new Padding(22, 40, 22, 0) };
+    readonly Label buildTitle = new() { Dock = DockStyle.Top, Height = 30, Font = new Font("Segoe UI Semibold", 11f), AutoEllipsis = true };
+    readonly ProgressBar buildBar = new() { Dock = DockStyle.Top, Height = 14, Maximum = 1000, Style = ProgressBarStyle.Continuous };
+    readonly Label buildStep = new() { Dock = DockStyle.Top, Height = 44, Padding = new Padding(0, 8, 0, 0), AutoEllipsis = true };
+    readonly Label buildNote = new() { Dock = DockStyle.Top, Height = 40, ForeColor = SystemColors.GrayText, Text = "This happens once per car. E-Sys can stay open." };
+    readonly System.Windows.Forms.Timer buildTimer = new() { Interval = 150 };
+    double shownPercent, reportedPercent;
+    string buildWhat = "";
+
+    void SetUpBuildScreen(Control listHolder)
+    {
+        buildScreen.Controls.AddRange([buildNote, buildStep, buildBar, buildTitle]);
+        listHolder.Controls.Add(buildScreen);
+        buildScreen.BringToFront();
+        // Between the builder's steps the bar keeps creeping towards the next one (never reaching it), so a slow step
+        // (PSdZ starting can take a minute the first time) never looks frozen.
+        buildTimer.Tick += (_, _) =>
+        {
+            var next = reportedPercent < 3 ? 3 : reportedPercent < 8 ? 8 : reportedPercent < 15 ? 15 : reportedPercent < 50 ? 50 : reportedPercent < 60 ? 60 : Math.Min(100, reportedPercent + 3);
+            if (shownPercent < reportedPercent) shownPercent = reportedPercent;
+            else if (shownPercent < next - 0.5) shownPercent += Math.Max(0.02, (next - 0.5 - shownPercent) * 0.012);
+            buildBar.Value = (int)Math.Clamp(shownPercent * 10, 0, 1000);
+            buildStep.Text = $"{buildWhat}   {(int)shownPercent}%";
+        };
+    }
+
     /// <summary>First start of a car that is not built yet: the builder makes it from this PC's E-Sys and PSdZData.</summary>
     async Task<Model?> Build(Model m)
     {
         building = true;
         start.Enabled = false;
         list.Enabled = false;
+        addCar.Enabled = practice.Enabled = options.Enabled = false;
         status.Text = $"Building {m.Name} from your PSdZData. This takes a minute or two, once.";
+        buildTitle.Text = "Building " + m.Name;
+        shownPercent = reportedPercent = 0;
+        buildWhat = "Starting the builder";
+        buildScreen.Visible = true;
+        list.Visible = false;
+        buildTimer.Start();
         UpdateTray();
-        var (ok, message) = await Builder.Build(m.Folder);
+        var (ok, message) = await Builder.Build(m.Folder, (percent, what) =>
+        {
+            reportedPercent = percent;
+            buildWhat = what;
+        });
+        buildTimer.Stop();
+        buildScreen.Visible = false;
+        list.Visible = true;
         building = false;
         list.Enabled = true;
         start.Enabled = true;
+        addCar.Enabled = practice.Enabled = options.Enabled = true;
         if (!ok || ModelIn(m.Folder) is not { Modules: > 0 } built)
         {
             status.Text = "Could not build this car: " + message;
@@ -504,9 +571,29 @@ sealed class PickerForm : Form
                 form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size));
                 bitmap.Save(Path.ChangeExtension(path, ".practice.png"));
             }
+            // Add a car with the F30 picked; FAKECAR_PICTURE_ADD=1 also adds it, so the car started below is that one.
+            try
+            {
+            using (var form = new NewCarForm(carsFolder) { StartPosition = FormStartPosition.Manual, Location = new Point(-6000, -6000) })
+            {
+                form.Show();
+                for (var i = 0; i < 240 && !form.Ready; i++) await Task.Delay(250);
+                form.Pick("F30", "8B33");
+                await Task.Delay(300);
+                using var bitmap = new Bitmap(form.Width, form.Height);
+                form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, form.Size));
+                bitmap.Save(Path.ChangeExtension(path, ".addcar.png"));
+                if (Environment.GetEnvironmentVariable("FAKECAR_PICTURE_ADD") == "1" && form.AddNow() is { } folder && ModelIn(folder) is { } added) list.Items.Add(added);
+            }
+            }
+            catch (Exception e) { File.WriteAllText(path + ".error.txt", e.ToString()); }
             list.SelectedIndex = list.Items.Count - 1;
             start.PerformClick();
-            for (var i = 0; i < 360 && (building || runningModel is null) && !status.Text.StartsWith("Could not", StringComparison.Ordinal); i++) await Task.Delay(500);
+            for (var i = 0; i < 360 && (building || runningModel is null) && !status.Text.StartsWith("Could not", StringComparison.Ordinal); i++)
+            {
+                await Task.Delay(500);
+                if (i == 30 && building) Save(Path.ChangeExtension(path, ".building.png"));
+            }
             await Task.Delay(1000);
             Save(path);
             // A tester connecting shows in the status line.

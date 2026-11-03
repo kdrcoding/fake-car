@@ -64,7 +64,16 @@ public final class CarBuilder {
         }
     }
 
+    /** How far the build is, for Fake Car's progress bar: "Progress: 45 Working out the software". */
+    static void progress(int percent, String what) {
+        out.println("Progress: " + percent + " " + what);
+    }
+
     static void run(String[] a) throws Exception {
+        if (a.length == 2 && a[0].equals("--types")) {
+            types(new File(a[1]).getAbsoluteFile());
+            return;
+        }
         if (a.length < 2) {
             out.println("usage: CarBuilder <car folder> <PSdZData parent folder, e.g. C:\\Data>");
             System.exit(2);
@@ -78,8 +87,9 @@ public final class CarBuilder {
             }
         }));
         // Until the build is done the car counts as not built (a build that stops halfway leaves nothing to start).
-        new File(car, "modules.txt").delete();
+        write(new File(car, "building.txt"), "A build started and has not finished.\n");
         new File(car, "built.txt").delete();
+        progress(3, "Reading your PSdZData");
         Map<String, String> settings = settings(new File(car, "car.txt"));
         String faXml = read(new File(car, "FA.xml"));
         Order order = new Order(faXml);
@@ -93,9 +103,12 @@ public final class CarBuilder {
         // OUTDATED=60,63: these modules keep the software they were built with, so E-Sys has something to flash.
         Set<Integer> outdated = new HashSet<>();
         for (String a1 : settings.getOrDefault("OUTDATED", "").split(",")) if (!a1.trim().isEmpty()) outdated.add(Integer.parseInt(a1.trim(), 16));
+        progress(8, "Finding the modules this car has");
         List<String> modules = kis(new File(data, "psdzdata\\kiswb\\" + series), order, build, current, outdated);
         write(new File(car, "modules.txt"), String.join("\n", modules) + "\n");
         out.println("Modules: " + modules.size());
+        if (modules.isEmpty()) throw new IllegalArgumentException("no modules for type " + order.type + " at " + build + ": its build date is probably outside the time this type was made");
+        progress(15, "Starting PSdZ (the slow part, longest the first time)");
 
         long t = System.currentTimeMillis();
         Configuration conf = ServiceLocator.locate(Configuration.class);
@@ -113,6 +126,7 @@ public final class CarBuilder {
         conf.setPSdZProperties(coding);
         Logic logic = ServiceLocator.locate(Logic.class);
         out.println("PSdZ ready in " + (System.currentTimeMillis() - t) / 1000 + " s");
+        progress(50, "Working out the software for each module");
 
         FA fa = new FA();
         fa.parseXML(faXml.substring(faXml.indexOf("<ns2:fa>"), faXml.indexOf("</ns2:fa>") + 9).replace("ns2:", ""));
@@ -142,10 +156,12 @@ public final class CarBuilder {
         // Where the order leaves a setting undecided, the CAF's own default values stand in.
         deleteTree(new File(car, "NCD"));
         deleteTree(new File(car, "NCD_default"));
-        int coded = 0, defaults = 0;
+        int coded = 0, defaults = 0, total = 0, done = 0;
+        for (Set<SGBMID> ids : cafds.values()) total += ids.size();
         for (Map.Entry<Integer, Set<SGBMID>> e : cafds.entrySet()) {
             String folder = String.format("%02X", e.getKey());
             for (SGBMID id : e.getValue()) {
+                progress(60 + 38 * done++ / Math.max(1, total), "Making the factory coding (" + done + " of " + total + ")");
                 NCD def = logic.generateNCD(new SGBMID[] {id})[0];
                 write(new File(car, "NCD_default\\" + folder + "\\" + id.toFileName("ncd")), def.getAsMotorolaSString());
                 Map<ECUIdentifier, Set<SGBMID>> one = new HashMap<>();
@@ -169,6 +185,8 @@ public final class CarBuilder {
         // What this build used: the I-steps (they may differ from car.txt on older PSdZData) and the PSdZData folder.
         write(new File(car, "built.txt"), "# Written by the builder: the I-steps your PSdZData has for this car, and where it was built from.\n"
                 + "ISTEP_SHIPMENT=" + build + "\nISTEP_LAST=" + settings.get("ISTEP_LAST") + "\nISTEP_CURRENT=" + current + "\nDATA=" + data.getPath() + "\n");
+        new File(car, "building.txt").delete();
+        progress(100, "Done");
         out.println("Done: " + car);
         System.exit(0);
     }
@@ -268,7 +286,8 @@ public final class CarBuilder {
         if (families == null) throw new IllegalStateException("no KIS in " + data);
         String month = order.time.substring(0, 2) + "-" + order.time.substring(2); // YY-MM
         for (File family : families) {
-            if (!new File(family, "KIS.script").isFile()) continue;
+            // A car picked in Fake Car's Add a car window names its family (FAMILY=F020); a saved FA is looked up in all.
+            if (!new File(family, "KIS.script").isFile() || !family.getName().equals(settings.getOrDefault("FAMILY", family.getName()))) continue;
             try (Connection c = open(family)) {
                 PreparedStatement p = c.prepareStatement("SELECT COUNT(*) FROM KIS.FAHRZEUGTYP WHERE NAME=?");
                 p.setString(1, order.type);
@@ -292,6 +311,46 @@ public final class CarBuilder {
             }
         }
         throw new IllegalArgumentException("type key " + order.type + " is not in your PSdZData");
+    }
+
+    /**
+     * Every car type in this PSdZData, for Fake Car's "Add a car" window. One line per I-step family ("istep", family,
+     * its I-step months YY-MM,YY-MM,...) and per type ("type", family, body series, type key, body, engine, cc, drive, market, steering,
+     * built from YYYY-MM, built until YYYY-MM).
+     * Motorbike and other families Fake Car cannot be (K, X, NA) are left out.
+     */
+    static void types(File data) throws Exception {
+        File[] families = new File(data, "psdzdata\\kiswb").listFiles(File::isDirectory);
+        if (families == null) throw new IllegalStateException("no KIS in " + data);
+        java.util.Arrays.sort(families);
+        String[] keys = {"EBR", "KFORM", "MBR", "HUBR", "ANTR", "AUSF", "LENK"};
+        for (File family : families) {
+            String f = family.getName();
+            if (f.startsWith("K") || f.startsWith("X") || f.startsWith("NA") || !new File(family, "KIS.script").isFile()) continue;
+            try (Connection c = open(family)) {
+                // The months the family has I-steps in (YY-MM): PSdZ takes only those as a vehicle order's build date.
+                ResultSet r = c.createStatement().executeQuery("SELECT DISTINCT SUBSTRING(NAME, 6, 5) FROM KIS.ISTUFE WHERE NAME LIKE '" + f + "-__-__-___' ORDER BY 1");
+                List<String> months = new ArrayList<>();
+                while (r.next()) months.add(r.getString(1));
+                if (months.isEmpty()) continue;
+                out.println("istep\t" + f + "\t" + String.join(",", months));
+                // Only types with a production time (TYPINHALT_VBA): the build date must fall in it, or the FA has no FP
+                // and KIS finds no modules. Types without one (special variants) are left out.
+                r = c.createStatement().executeQuery("SELECT F.NAME, F.TYPMERKMALE, MIN(V.VBA_VON), MAX(V.VBA_BIS) FROM KIS.FAHRZEUGTYP F"
+                        + " JOIN KIS.TYPINHALT_VBA V ON V.FAHRZEUGTYP_ID=F.ID GROUP BY F.NAME, F.TYPMERKMALE ORDER BY F.NAME");
+                while (r.next()) {
+                    Map<String, String> features = new HashMap<>();
+                    for (String kv : String.valueOf(r.getString(2)).split(";")) if (kv.contains("=")) features.put(kv.substring(0, kv.indexOf('=')), kv.substring(kv.indexOf('=') + 1));
+                    if (features.get("EBR") == null || r.getString(3) == null) continue;
+                    StringBuilder line = new StringBuilder("type\t" + f + "\t" + features.get("EBR") + "\t" + r.getString(1).trim());
+                    for (int i = 1; i < keys.length; i++) line.append('\t').append(features.getOrDefault(keys[i], ""));
+                    line.append('\t').append(r.getString(3), 0, 7).append('\t').append(r.getString(4) == null ? "2099-12" : r.getString(4).substring(0, 7));
+                    out.println(line);
+                }
+            } catch (Exception e) {
+                out.println("skipped\t" + f + "\t" + String.valueOf(e.getMessage()).split("\\R")[0]);
+            }
+        }
     }
 
     /**

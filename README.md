@@ -143,16 +143,24 @@ Use the **F30 340i with old cluster software**: its instrument cluster still has
 3. In the FA tree, right-click the FA and choose **Activate FA**. E-Sys works out the FP.
 4. Tab **Master**, **Write** under FA/FP.
 
-## Your own car
+## Add a car
 
-Save your car's vehicle order in E-Sys (**Expert Mode > VCM**, **Read**, then **Save** the FA). In Fake Car, click **Add your own car** and pick that file. Fake Car makes a new car from it with a made-up VIN and takes the I-steps from your PSdZData. Press **Start**: it is built the first time.
+Click **Add a car**. Pick the **Series** (F30, G80, X5...) and the **Model** from the list your PSdZData has, with its engine, drive, market and the years it was made. Pick when it was **Built** (only dates that car was really made are offered) and press **Add car**. Fake Car makes it with base equipment and a made-up VIN and builds it straight away. **Choose...** next to PSdZData picks other PSdZData, old or new.
+
+<img src="docs/add-car.png" alt="Add a car: series F30, the 340i model, built 11/2015" width="560">
+
+Building shows how far it is, so you can see it working. Starting PSdZ is the slow part, mostly the first time.
+
+<img src="docs/building.png" alt="Fake Car building a car: progress bar and the step it is on" width="496">
+
+For a car with all its options, click **Use a vehicle order saved in E-Sys** in the same window. Save your car's vehicle order in E-Sys first (**Expert Mode > VCM**, **Read**, then **Save** the FA) and pick that file. Fake Car makes a new car from it with a made-up VIN and takes the I-steps from your PSdZData.
 
 ## Your own car model by hand
 
 Copy a car folder and change two files:
 
 - `FA.xml`: the vehicle order. `typeKey` (type key), `series` (development series, for example F030 for an F30), `timeCriteria` (MMYY), the SA codes.
-- `car.txt`: name, a made-up VIN with a valid check digit, mileage (`KM`), battery. The I-steps (`ISTEP_SHIPMENT`, `ISTEP_LAST`, `ISTEP_CURRENT`) are optional: without them the builder takes them from your PSdZData and writes them in.
+- `car.txt`: name, a made-up VIN with a valid check digit, mileage (`KM`), battery, and optionally `FAMILY` (the PSdZData family to look in, F020 for an F30). The I-steps (`ISTEP_SHIPMENT`, `ISTEP_LAST`, `ISTEP_CURRENT`) are optional: without them the builder takes them from your PSdZData and writes them in.
 
 `faults.txt` lists the faults it has stored (module address, fault code, status, count, km).
 

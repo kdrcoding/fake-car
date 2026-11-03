@@ -77,11 +77,15 @@ public final class CarBuilder {
             public synchronized void write(byte[] b, int off, int len) {
             }
         }));
+        // Until the build is done the car counts as not built (a build that stops halfway leaves nothing to start).
+        new File(car, "modules.txt").delete();
+        new File(car, "built.txt").delete();
         Map<String, String> settings = settings(new File(car, "car.txt"));
         String faXml = read(new File(car, "FA.xml"));
         Order order = new Order(faXml);
         // A car made from your own FA has no I-steps yet: take them from the KIS that knows its type key.
         if (settings.get("ISTEP_CURRENT") == null) isteps(data, order, new File(car, "car.txt"), settings);
+        fit(data, settings);
         String build = settings.get("ISTEP_SHIPMENT"), current = settings.get("ISTEP_CURRENT");
         String series = current.substring(0, 4);
 
@@ -162,6 +166,9 @@ public final class CarBuilder {
             }
         }
         out.println("Coding: " + coded + " CAFDs coded for this order, " + defaults + " on default values");
+        // What this build used: the I-steps (they may differ from car.txt on older PSdZData) and the PSdZData folder.
+        write(new File(car, "built.txt"), "# Written by the builder: the I-steps your PSdZData has for this car, and where it was built from.\n"
+                + "ISTEP_SHIPMENT=" + build + "\nISTEP_LAST=" + settings.get("ISTEP_LAST") + "\nISTEP_CURRENT=" + current + "\nDATA=" + data.getPath() + "\n");
         out.println("Done: " + car);
         System.exit(0);
     }
@@ -285,6 +292,37 @@ public final class CarBuilder {
             }
         }
         throw new IllegalArgumentException("type key " + order.type + " is not in your PSdZData");
+    }
+
+    /**
+     * Older PSdZData does not know the newest I-steps in car.txt: each one becomes the closest this KIS has (the newest at
+     * or before it, else the oldest), with the shipment and last I-steps never after the current one. A car whose I-steps
+     * are all there is built exactly as before.
+     */
+    static void fit(File data, Map<String, String> settings) throws Exception {
+        String series = settings.get("ISTEP_CURRENT").substring(0, 4);
+        File kisFolder = new File(data, "psdzdata\\kiswb\\" + series);
+        if (!new File(kisFolder, "KIS.script").isFile()) throw new IllegalArgumentException("your PSdZData has no " + series + " data, and this car needs it");
+        List<String> names = new ArrayList<>();
+        try (Connection c = open(kisFolder)) {
+            ResultSet r = c.createStatement().executeQuery("SELECT NAME FROM KIS.ISTUFE WHERE NAME LIKE '" + series + "-__-__-___' ORDER BY NAME");
+            while (r.next()) names.add(r.getString(1));
+        }
+        if (names.isEmpty()) throw new IllegalArgumentException("your PSdZData has no " + series + " I-steps");
+        String current = closest(names, settings.get("ISTEP_CURRENT"));
+        for (String key : new String[] {"ISTEP_SHIPMENT", "ISTEP_LAST", "ISTEP_CURRENT"}) {
+            // The last I-step is only told to the tester (the KIS does not list every one): it just may not pass the current one.
+            String wanted = settings.getOrDefault(key, current), got = key.equals("ISTEP_LAST") ? wanted : closest(names, wanted);
+            if (got.compareTo(current) > 0) got = current;
+            if (!got.equals(wanted)) out.println("I-step " + key + ": " + wanted + " is not in your PSdZData, using " + got);
+            settings.put(key, got);
+        }
+    }
+
+    static String closest(List<String> names, String wanted) {
+        String best = names.get(0);
+        for (String name : names) if (name.compareTo(wanted) <= 0) best = name;
+        return best;
     }
 
     static List<String> kis(File kisFolder, Order order, String build, String current, Set<Integer> outdated) throws Exception {

@@ -23,6 +23,12 @@ static class Options
     /// <summary>A note next to the clock when a tester connects while the window is hidden.</summary>
     public static bool Notify { get => Get("NOTIFY", true); set => Set("NOTIFY", value); }
 
+    /// <summary>The folder holding psdzdata the cars are built from; empty = the one E-Sys uses.</summary>
+    public static string DataFolder { get => Values.GetValueOrDefault("DATA_FOLDER", ""); set => Put("DATA_FOLDER", value); }
+
+    /// <summary>The E-Sys folder the builder runs with; empty = the newest found.</summary>
+    public static string EsysFolder { get => Values.GetValueOrDefault("ESYS_FOLDER", ""); set => Put("ESYS_FOLDER", value); }
+
     /// <summary>The car folder name that ran last.</summary>
     public static string LastCar { get => Values.GetValueOrDefault("LAST_CAR", ""); set => Put("LAST_CAR", value); }
 
@@ -106,6 +112,14 @@ sealed class OptionsForm : Form
         Add(rows, "Let other PCs on the network connect",
             "Off: only E-Sys on this PC can connect, with the gateway URL tcp://127.0.0.1:6801.",
             Options.Network, v => Options.Network = v);
+        AddFolder(rows, "PSdZData folder", "Cars are built from it. Old PSdZData works too: the car gets the newest I-steps it has.",
+            () => Options.DataFolder, v => Options.DataFolder = v, Builder.DataFolderFor,
+            "Pick the folder that holds psdzdata (for example C:\\Data), or psdzdata itself.",
+            () => Builder.Folders().Data, "the one E-Sys uses");
+        AddFolder(rows, "E-Sys folder", "",
+            () => Options.EsysFolder, v => Options.EsysFolder = v, f => Builder.IsEsys(f) ? f : null,
+            "Pick the E-Sys folder (the one with lib and jre in it).",
+            () => Builder.Folders().Esys ?? "none found", "the newest found");
 
         var close = new Button { Text = "Close", Width = 96, Height = 30, DialogResult = DialogResult.OK, Anchor = AnchorStyles.Right };
         var bottom = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(0, 4, 14, 12) };
@@ -117,6 +131,47 @@ sealed class OptionsForm : Form
         Controls.Add(all);
         AcceptButton = close;
         CancelButton = close;
+    }
+
+    /// <summary>Every folder line: the PSdZData E-Sys uses follows a newly chosen E-Sys.</summary>
+    readonly List<Action> shown = [];
+
+    /// <summary>A folder the builder uses: what it is now, Choose to pick one, Automatic to let Fake Car find it again.</summary>
+    void AddFolder(FlowLayoutPanel rows, string title, string note, Func<string> chosen, Action<string> save, Func<string, string?> check,
+        string pickText, Func<string> inUse, string automatic)
+    {
+        rows.Controls.Add(new Label { Text = title, AutoSize = true, Font = new Font(Font, FontStyle.Bold), Margin = new Padding(0, 12, 0, 0) });
+        var path = new Label { AutoSize = true, MaximumSize = new Size(420, 0), Margin = new Padding(0, 2, 0, 0) };
+        var choose = new Button { Text = "Choose...", AutoSize = true, Margin = new Padding(0, 4, 6, 0) };
+        var auto = new Button { Text = "Automatic", AutoSize = true, Margin = new Padding(0, 4, 0, 0) };
+        void Show()
+        {
+            path.Text = inUse() + (chosen().Length > 0 ? "" : $"   ({automatic})");
+            auto.Enabled = chosen().Length > 0;
+        }
+        void Change(string value)
+        {
+            save(value);
+            Builder.Forget();
+            foreach (var show in shown) show();
+        }
+        choose.Click += (_, _) =>
+        {
+            using var dialog = new FolderBrowserDialog { Description = pickText, UseDescriptionForTitle = true, InitialDirectory = inUse() };
+            if (dialog.ShowDialog(this) != DialogResult.OK) return;
+            if (check(dialog.SelectedPath) is { } folder) Change(folder);
+            else MessageBox.Show(this, $"{dialog.SelectedPath} is not it. {pickText}", "Fake Car", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        };
+        auto.Click += (_, _) => Change("");
+        shown.Add(Show);
+        Show();
+        rows.Controls.Add(path);
+        var buttons = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+        buttons.Controls.Add(choose);
+        buttons.Controls.Add(auto);
+        rows.Controls.Add(buttons);
+        if (note.Length > 0)
+            rows.Controls.Add(new Label { Text = note, AutoSize = true, MaximumSize = new Size(420, 0), ForeColor = SystemColors.GrayText, Margin = new Padding(0, 2, 0, 2) });
     }
 
     void Add(FlowLayoutPanel rows, string text, string note, bool value, Action<bool> save)

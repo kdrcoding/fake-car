@@ -179,6 +179,15 @@ sealed class PickerForm : Form
             if (!Visible) form.StartPosition = FormStartPosition.CenterScreen;
             form.ShowDialog(Visible ? this : null);
         }
+        // Other PSdZData: the cars built from the old one show as not built (the running car keeps going).
+        var picked = list.SelectedIndex;
+        for (var i = 0; i < list.Items.Count; i++)
+        {
+            var old = (Model)list.Items[i];
+            if (old != runningModel && ModelIn(old.Folder) is { } now && now != old) list.Items[i] = now;
+        }
+        list.SelectedIndex = picked;
+        if (!building) ShowState();
         // Who may connect changed: the running car starts again with the new choice (what was coded stays).
         if (network != Options.Network && runningModel is { } m && !building)
         {
@@ -334,8 +343,10 @@ sealed class PickerForm : Form
         var settingsFile = Path.Combine(dir, "car.txt");
         var modulesFile = Path.Combine(dir, "modules.txt");
         if (!File.Exists(settingsFile) || (!File.Exists(modulesFile) && !File.Exists(Path.Combine(dir, "FA.xml")))) return null;
-        var settings = Car.ReadSettings(settingsFile);
+        var settings = Car.Settings(dir);
         var modules = File.Exists(modulesFile) ? File.ReadLines(modulesFile).Count(l => l.Length > 0 && !l.StartsWith('#')) : 0;
+        // Built from other PSdZData than the one in use now: it is built again on its next start.
+        if (settings.TryGetValue("DATA", out var data) && Builder.IsData(Builder.Folders().Data) && !Builder.SameFolder(data, Builder.Folders().Data)) modules = 0;
         // The E-Sys target is the PSdZData project of the car's I-step: F020-26-07-530 is F020_26_07_530_...
         var target = settings.GetValueOrDefault("ISTEP_CURRENT", "").Replace('-', '_');
         return new Model(dir, settings.GetValueOrDefault("NAME", Path.GetFileName(dir)), settings.GetValueOrDefault("VIN", ""), modules, target);

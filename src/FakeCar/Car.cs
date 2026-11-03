@@ -98,7 +98,7 @@ sealed class Car
 
     public static Car Load(string folder)
     {
-        var settings = ReadSettings(Path.Combine(folder, "car.txt"));
+        var settings = Settings(folder);
         var car = new Car { Vin = settings["VIN"], Folder = folder };
         var problems = Practice.Problems(folder);
         car.Silent.UnionWith(Practice.Addresses(problems.GetValueOrDefault(Practice.SilentKey, "")));
@@ -324,6 +324,16 @@ sealed class Car
             if (!car.Ecus.TryGetValue(address, out var ecu)) continue;
             ecu.Faults.Add(new Fault(Convert.ToInt32(p[1], 16), Convert.ToByte(p[2], 16), byte.Parse(p[3], CultureInfo.InvariantCulture), int.Parse(p[4], CultureInfo.InvariantCulture)));
         }
+    }
+
+    /// <summary>car.txt, with the I-steps and PSdZData folder of the last build (built.txt) on top.</summary>
+    internal static Dictionary<string, string> Settings(string folder)
+    {
+        var settings = ReadSettings(Path.Combine(folder, "car.txt"));
+        var built = Path.Combine(folder, "built.txt");
+        if (File.Exists(built))
+            foreach (var (key, value) in ReadSettings(built)) settings[key] = value;
+        return settings;
     }
 
     internal static Dictionary<string, string> ReadSettings(string path)

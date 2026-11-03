@@ -77,6 +77,8 @@ Close the window and the car keeps running. Click the Fake Car icon next to the 
 | Start Fake Car with Windows | Fake Car starts next to the clock, without the window, with the last car on. |
 | Tell me when a tester connects | A short note next to the clock while the window is closed. The window always shows it. |
 | Let other PCs on the network connect | On by default. Off: only E-Sys on this PC can connect, with the gateway URL `tcp://127.0.0.1:6801`. |
+| PSdZData folder | The PSdZData the cars are built from. Automatic: the one E-Sys uses. Choose another, older or newer: the cars are built again from it on their next start. |
+| E-Sys folder | The E-Sys the builder runs with. Automatic: the newest found. |
 
 Options are kept in `%APPDATA%\FakeCar\options.txt`, so a newer Fake Car keeps them.
 
@@ -84,6 +86,7 @@ Options are kept in `%APPDATA%\FakeCar\options.txt`, so a newer Fake Car keeps t
 
 - Windows 10 or 11 (nothing else to install)
 - E-Sys with PSdZData for the car's series: F010 (F10), F020 (F30, F80), F025 (F15), F056 (MINI F56), S15A (G30, F90), S18A (G20, G05, G80)
+- Any PSdZData version, old or new: when yours does not have a car's I-steps, the car gets the closest ones it has, and the window shows that target.
 
 ## What you can do with it
 

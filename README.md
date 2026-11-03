@@ -4,7 +4,7 @@
 
 Use it to learn E-Sys, try a coding tool before it touches a real car, or record a video without a car and without showing a real VIN.
 
-**[Download the latest version](https://github.com/kdrcoding/fake-car/releases/latest)** · Free · Windows 10 and 11 · 11 car models · by kdrcoding
+**[Download the latest version](https://github.com/kdrcoding/fake-car/releases/latest)** · Free · Windows 10 and 11 · 11 car models · by [esysmax](https://esysmax.com)
 
 <img src="docs/fake-car-window.png" alt="The Fake Car window: a G80 M3 running, a tester connected from this PC" width="496">
 
@@ -199,6 +199,6 @@ jar cf builder\CarBuilder.jar -C classes .
 
 ## Licence
 
-Free to use and to share unchanged. Changed versions may not be shared, and the "by kdrcoding" credit must stay. See [LICENSE](LICENSE). Versions 1.0.0 to 1.2.0 were released under MIT.
+Free to use and to share unchanged. Changed versions may not be shared, and the "by esysmax" credit must stay. See [LICENSE](LICENSE). Versions 1.0.0 to 1.2.0 were released under MIT.
 
 Not made by or connected with BMW AG. BMW, E-Sys and ISTA are names of their owners.

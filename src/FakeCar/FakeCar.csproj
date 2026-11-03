@@ -12,11 +12,11 @@
     <Version>1.6.0</Version>
     <ApplicationIcon>fakecar.ico</ApplicationIcon>
     <Product>Fake Car</Product>
-    <AssemblyTitle>Fake Car by kdrcoding</AssemblyTitle>
-    <Company>kdrcoding</Company>
-    <Authors>kdrcoding</Authors>
-    <Description>Fake Car by kdrcoding: a pretend BMW for E-Sys</Description>
-    <Copyright>Copyright (c) 2026 kdrcoding</Copyright>
+    <AssemblyTitle>Fake Car by esysmax</AssemblyTitle>
+    <Company>esysmax</Company>
+    <Authors>esysmax</Authors>
+    <Description>Fake Car by esysmax (esysmax.com): a pretend BMW for E-Sys</Description>
+    <Copyright>Copyright (c) 2026 esysmax</Copyright>
   </PropertyGroup>
 
   <ItemGroup>

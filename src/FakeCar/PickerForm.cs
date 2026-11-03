@@ -37,6 +37,7 @@ sealed class PickerForm : Form
     Model? autoStart;
 
     const string Page = "https://github.com/kdrcoding/fake-car";
+    const string Website = "https://esysmax.com";
 
     public static string Version => typeof(PickerForm).Assembly.GetName().Version is { } v ? $"{v.Major}.{v.Minor}.{v.Build}" : "";
 
@@ -46,7 +47,7 @@ sealed class PickerForm : Form
     {
         this.carsFolder = carsFolder;
         allowShow = !background;
-        Text = $"Fake Car {Version} by kdrcoding";
+        Text = $"Fake Car {Version} by esysmax";
         Icon = AppIcon(32);
         Font = new Font("Segoe UI", 9.5f);
         ClientSize = new Size(480, 384);
@@ -84,7 +85,9 @@ sealed class PickerForm : Form
         bottom.SetColumnSpan(links, 2);
 
         var title = new Label { Text = "Pick a car", Dock = DockStyle.Fill, Padding = new Padding(12, 10, 0, 0), Font = new Font("Segoe UI Semibold", 11f) };
-        var byline = new Label { Text = "by kdrcoding", Dock = DockStyle.Right, AutoSize = true, Padding = new Padding(0, 13, 14, 0), Font = new Font("Segoe UI", 8.5f), ForeColor = SystemColors.GrayText };
+        // The credit, with a small link to the website on its name.
+        var byline = new LinkLabel { Text = "by esysmax.com", Dock = DockStyle.Right, AutoSize = true, Padding = new Padding(0, 13, 14, 0), Font = new Font("Segoe UI", 8.5f), ForeColor = SystemColors.GrayText, LinkColor = SystemColors.GrayText, ActiveLinkColor = SystemColors.GrayText, VisitedLinkColor = SystemColors.GrayText, LinkBehavior = LinkBehavior.HoverUnderline, LinkArea = new LinkArea(3, 11) };
+        byline.LinkClicked += (_, _) => Open(Website);
         var header = new Panel { Dock = DockStyle.Top, Height = 34 };
         header.Controls.Add(title);
         header.Controls.Add(byline);
@@ -274,8 +277,8 @@ sealed class PickerForm : Form
 
     void ShowAbout()
     {
-        var text = $"Fake Car {Version}\nby kdrcoding\n\nA pretend BMW for E-Sys: read and write the vehicle order, code, flash and read faults without a real car. Every VIN is made up.\n\n"
-            + "Free to use and to share unchanged. Changed versions may not be shared, and the \"by kdrcoding\" credit must stay.\n\n"
+        var text = $"Fake Car {Version}\nby esysmax (esysmax.com)\n\nA pretend BMW for E-Sys: read and write the vehicle order, code, flash and read faults without a real car. Every VIN is made up.\n\n"
+            + "Free to use and to share unchanged. Changed versions may not be shared, and the \"by esysmax\" credit must stay.\n\n"
             + "Not made by or connected with BMW AG.\n\nOpen the Fake Car page on GitHub?";
         if (MessageBox.Show(this, text, "About Fake Car", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes) Open(Page);
     }

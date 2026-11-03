@@ -111,7 +111,7 @@ sealed class Log : IDisposable
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         writer = new StreamWriter(path, append: true) { AutoFlush = true };
-        writer.WriteLine($"Fake Car {PickerForm.Version} by kdrcoding, {DateTime.Now:yyyy-MM-dd}");
+        writer.WriteLine($"Fake Car {PickerForm.Version} by esysmax, {DateTime.Now:yyyy-MM-dd}");
     }
 
     public void Line(string text)

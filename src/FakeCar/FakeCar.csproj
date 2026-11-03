@@ -9,7 +9,7 @@
     <RootNamespace>FakeCar</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
     <UseWindowsForms>true</UseWindowsForms>
-    <Version>1.6.2</Version>
+    <Version>1.6.3</Version>
     <ApplicationIcon>fakecar.ico</ApplicationIcon>
     <Product>Fake Car</Product>
     <AssemblyTitle>Fake Car by esysmax</AssemblyTitle>

@@ -167,6 +167,7 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, 
         udp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
         udp.Client.Bind(new IPEndPoint(ListenOn, SearchPort));
         log.Line($"listening udp {Where}:{SearchPort} (vehicle search)");
+        var answered = DateTime.MinValue;
         while (!stop.IsCancellationRequested)
         {
             UdpReceiveResult got;
@@ -175,6 +176,11 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, 
             catch (SocketException) { continue; }
             if (got.Buffer.Length < 6 || BinaryPrimitives.ReadUInt16BigEndian(got.Buffer.AsSpan(4)) != ControlIdent) continue;
             if (OnlyThisPc && !FromThisPc(got.RemoteEndPoint.Address)) continue;
+            // E-Sys sends one search through every network card of this PC within a split second, and listed the car once
+            // per card (4 times on a PC with VPN and Hyper-V). A car on one cable answers once: this PC gets one answer
+            // per search round.
+            if (OnlyThisPc && DateTime.UtcNow - answered < TimeSpan.FromSeconds(1)) continue;
+            answered = DateTime.UtcNow;
             var payload = Identification();
             var frame = new byte[6 + payload.Length];
             BinaryPrimitives.WriteInt32BigEndian(frame, payload.Length);

@@ -14,6 +14,8 @@ sealed class Ecu
 
     public byte Address { get; }
     public string Name { get; }
+    /// <summary>The module's variant from modules.txt (DME-<b>MEVD1728</b>-DME1), or empty.</summary>
+    public string Variant { get; init; } = "";
     public Dictionary<ushort, byte[]> Dids { get; } = [];
     public List<Fault> Faults { get; } = [];
     public byte Session { get; set; } = 1;
@@ -115,7 +117,8 @@ sealed class Car
             var p = line.Split('\t');
             if (p.Length < 3 || line.StartsWith('#')) continue;
             var address = byte.Parse(p[0], NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-            car.Ecus[address] = new Ecu(address, p[1].Split('-')[0]);
+            var parts = p[1].Split('-');
+            car.Ecus[address] = new Ecu(address, parts[0]) { Variant = parts.Length > 1 ? parts[1] : "" };
         }
 
         foreach (var line in File.ReadAllLines(Path.Combine(folder, "svk.txt")))
@@ -165,14 +168,9 @@ sealed class Car
             cluster.Dids[0xD10D] = [(byte)(shown >> 24), (byte)(shown >> 16), (byte)(shown >> 8), (byte)shown,
                 (byte)(stored >> 24), (byte)(stored >> 16), (byte)(stored >> 8), (byte)stored];
         }
-        // Battery: voltage at the engine computer (mV) and its registered capacity (Ah).
-        if (car.Ecus.TryGetValue(0x12, out var dme))
-        {
-            var mv = problems.GetValueOrDefault(Practice.LowBatteryKey) == "1" ? Practice.LowBatteryMv
-                : int.Parse(settings.GetValueOrDefault("BATTERY_MV", "12580"), CultureInfo.InvariantCulture);
-            dme.Dids[0xF442] = [(byte)(mv >> 8), (byte)mv];
-            dme.Dids[0x4023] = [byte.Parse(settings.GetValueOrDefault("BATTERY_AH", "90"), CultureInfo.InvariantCulture)];
-        }
+        // Battery: voltage at the engine computer (mV), the battery sensor and battery state; service items (CBS);
+        // which job file the cluster, engine computer and brake module answer to (22 F150).
+        Service.Fill(car, settings, problems);
 
         // Terminal status at the body module (CAS on F-series, BDC on G): 0x0A = ignition on (KL15).
         if (car.Ecus.TryGetValue(0x40, out var body)) body.Dids[0xDC56] = [0x0A];

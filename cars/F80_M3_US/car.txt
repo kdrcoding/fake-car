@@ -7,3 +7,5 @@ ISTEP_CURRENT=F020-26-07-530
 KM=37845
 BATTERY_MV=12640
 BATTERY_AH=80
+# S55 engine: the engine computer answers as the S55 job file (service reset, battery)
+F150_12=0F1EA0

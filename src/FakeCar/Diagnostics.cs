@@ -109,6 +109,7 @@ sealed class Diagnostics(Car car, Log log)
     {
         if (req.Length < 4) return [0x7F, 0x2E, IncorrectLength];
         var did = (ushort)(req[1] << 8 | req[2]);
+        if (did == Service.Cbs) return ResetService(ecu, req);
         if (car.CodingFails.Contains(ecu.Address) && !IsVcm(did))
         {
             log.Line($"  WRITE {ecu.Name} [{ecu.Address:X2}] DID {did:X4} refused (practice: coding fails here)");
@@ -122,6 +123,22 @@ sealed class Diagnostics(Car car, Log log)
         return [0x6E, req[1], req[2]];
     }
 
+    /// <summary>Service item reset (2E 1001): the matching record changes; the read (22 1001) shows it, also after a restart.</summary>
+    byte[] ResetService(Ecu ecu, byte[] req)
+    {
+        if (!ecu.Dids.TryGetValue(Service.Cbs, out var records)) return [0x7F, 0x2E, RequestOutOfRange];
+        if (req.Length < 4 || req[3] == 0 || req.Length != 4 + req[3] * 11) return [0x7F, 0x2E, IncorrectLength];
+        if (Service.Reset(records, req) is not { } updated)
+        {
+            log.Line($"  SERVICE reset {ecu.Name} [{ecu.Address:X2}] item {req[4]:X2} not here");
+            return [0x7F, 0x2E, RequestOutOfRange];
+        }
+        ecu.Dids[Service.Cbs] = updated;
+        car.Changed(ecu, Service.Cbs);
+        log.Line($"  SERVICE reset {ecu.Name} [{ecu.Address:X2}] {Convert.ToHexString(req[3..])}");
+        return [0x6E, req[1], req[2]];
+    }
+
     static bool IsVcm(ushort did) => did is Dids.Fa or Dids.Fp or Dids.IStep;
 
     int codingWrites;
@@ -130,7 +147,7 @@ sealed class Diagnostics(Car car, Log log)
     /// <summary>Practice: the connection drops once, at the third coding write (before it is answered).</summary>
     public bool DropsHere(byte[] req)
     {
-        if (!car.DropDuringCoding || dropped || req is not [0x2E, _, _, _, ..] || IsVcm((ushort)(req[1] << 8 | req[2]))) return false;
+        if (!car.DropDuringCoding || dropped || req is not [0x2E, _, _, _, ..] || IsVcm((ushort)(req[1] << 8 | req[2])) || (req[1] << 8 | req[2]) == Service.Cbs) return false;
         if (++codingWrites < 3) return false;
         dropped = true;
         return true;

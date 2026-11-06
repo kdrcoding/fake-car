@@ -102,6 +102,7 @@ Options are kept in `%APPDATA%\FakeCar\options.txt`, so a newer Fake Car keeps t
 | Read and clear fault memory | Yes |
 | Mileage kept in the modules (for used-car checks) | Every module, the body module backup and the cluster's two totals |
 | Module reset | Yes |
+| Service reset (CBS) and battery registration with EDIABAS service tools | Instrument cluster, engine computer and brake module answer; resets are kept for next time |
 
 Tested with E-Sys 25.10: connecting, reading and writing FA, FP and I-steps, SVT, coding, and FSC actions (status, VIN, SID on the head unit). TAL calculation works on F- and G-series cars (F30 practice car: the cluster is planned for flashing; G80: up to date, nothing to flash). The `CAFD_FFFFFFFF` practice was fixed in E-Sys 25.10 with Detect CAF for SWE and Code. Running a full flash (Execute) is not tested yet. ISTA finds cars the same way over the network, but it is not tested yet either.
 
@@ -198,6 +199,7 @@ Every request and answer is written to `fakecar.log` in the car's folder.
 ## Build from source
 
 - Fake Car: .NET 10 SDK, `dotnet build src\FakeCar -c Release -o build`
+- Tests: `dotnet test tests\FakeCar.Tests`
 - Builder: JDK 11 or newer, compiled against E-Sys's `lib\PsdZ\psdz-api.jar`:
 
 ```

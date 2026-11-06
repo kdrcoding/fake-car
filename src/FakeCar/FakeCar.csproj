@@ -9,7 +9,7 @@
     <RootNamespace>FakeCar</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
     <UseWindowsForms>true</UseWindowsForms>
-    <Version>1.6.3</Version>
+    <Version>1.6.4</Version>
     <ApplicationIcon>fakecar.ico</ApplicationIcon>
     <Product>Fake Car</Product>
     <AssemblyTitle>Fake Car by esysmax</AssemblyTitle>
@@ -18,6 +18,10 @@
     <Description>Fake Car by esysmax (esysmax.com): a pretend BMW for E-Sys</Description>
     <Copyright>Copyright (c) 2026 esysmax</Copyright>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FakeCar.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="fakecar.ico" LogicalName="FakeCar.fakecar.ico" />

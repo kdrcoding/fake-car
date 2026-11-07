@@ -59,6 +59,7 @@ public final class CarBuilder {
         } catch (Throwable e) {
             Throwable c = e;
             while (c.getCause() != null) c = c.getCause();
+            e.printStackTrace(System.err);
             out.println("Failed: " + String.valueOf(c.getMessage() != null ? c.getMessage() : c).split("\\R")[0]);
             System.exit(1);
         }
@@ -123,7 +124,14 @@ public final class CarBuilder {
         coding.setProperty("ProgrammierGeraeteTyp", "01");
         coding.setProperty("ProgrammingSequenceUseCase", "DEVELOPMENT");
         coding.setProperty("Testereinsatzkennung", "FF");
-        conf.setPSdZProperties(coding);
+        // E-Sys 25.10's PSdZ takes the plant ID in hex (PlantIDhex=04D2); E-Sys 22.06-24.06 take it in decimal
+        // (PlantIDdec=1234) and fail on hex with "For input string: 04D2". Same plant, try both forms.
+        try {
+            conf.setPSdZProperties(coding);
+        } catch (RuntimeException hexRefused) {
+            coding.setProperty("PlantID", "1234");
+            conf.setPSdZProperties(coding);
+        }
         Logic logic = ServiceLocator.locate(Logic.class);
         out.println("PSdZ ready in " + (System.currentTimeMillis() - t) / 1000 + " s");
         progress(50, "Working out the software for each module");

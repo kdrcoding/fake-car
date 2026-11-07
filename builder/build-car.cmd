@@ -43,10 +43,14 @@ if not exist "%JAVA%" (
 )
 rem Read the Java's bitness and version (Java 8 prints "1.8.0_x", so "1." = too old).
 set "BITS=" & set "JV="
-"%JAVA%" -XshowSettings:properties -version >"%TEMP%\fc-java.txt" 2>&1
-for /f "tokens=2 delims==" %%B in ('findstr /i "sun.arch.data.model" "%TEMP%\fc-java.txt"') do set "BITS=%%B"
-for /f "tokens=2 delims==" %%V in ('findstr /i "java.version" "%TEMP%\fc-java.txt"') do set "JV=%%V"
-del "%TEMP%\fc-java.txt" >nul 2>&1
+rem No temp file: two builds started in the same second would share it (cmd's %RANDOM% is seeded per second).
+for /f "tokens=2 delims==" %%B in ('call "%JAVA%" -XshowSettings:properties -version 2^>^&1 ^| findstr /i "sun.arch.data.model"') do set "BITS=%%B"
+for /f "tokens=2 delims==" %%V in ('call "%JAVA%" -XshowSettings:properties -version 2^>^&1 ^| findstr /i /c:"java.version ="') do set "JV=%%V"
+if not defined JV (
+  echo Failed: could not start the Java in "%ESYS%\jre". Pick your E-Sys folder under Options, or use E-Sys 22.06 or newer.
+  exit /b 3
+)
+if not defined BITS set "BITS=64"
 set "BITS=%BITS: =%"
 set "JV=%JV: =%"
 set "MAJ=0"

@@ -12,6 +12,7 @@ Use it to learn E-Sys, try a coding tool before it touches a real car, or record
 
 1. Download `FakeCar-<version>.zip` from [Releases](https://github.com/kdrcoding/fake-car/releases/latest) and unzip it anywhere.
 2. Start `FakeCar.exe`, pick a car, press **Start**. The first start of a car builds it from your PSdZData (a minute or two, once).
+   - You need **E-Sys 22.06 or newer** (its own Java 11 is used to build the cars). Older E-Sys versions are not supported: the builder stops with a message that says so.
 3. In E-Sys, click **Open Connection** and either
    - pick the Fake Car by its VIN under **Connection via VIN**, or
    - choose **Connection via gateway URL**, enter `tcp://127.0.0.1:6801`, pick the target the Fake Car window shows for the running car (for example `F020_26_07_530` for the F30), and tick **Read parameters from VCM**. A target of another series connects too, but E-Sys's TAL calculation then stops with a PSdZ error ("DetailInfo must not be null").

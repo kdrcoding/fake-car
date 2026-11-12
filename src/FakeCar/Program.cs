@@ -29,6 +29,12 @@ static class Program
         {
             ApplicationConfiguration.Initialize();
             var picture = options.GetValueOrDefault("picture");
+            // An older Fake Car still running (next to the clock, or started with Windows) gives way to this newer one: before,
+            // opening a newly downloaded copy only showed the old window again (owner 2026-11-12: "always 1.6.5").
+            if (!createdNew && picture is null && OlderOneStopped(stopEvent))
+                createdNew = true;
+            if (createdNew && picture is null)
+                Options.FollowNewest();
             if (!createdNew && picture is null)
             {
                 // A second start brings the running window to the front (also when it sits next to the clock).
@@ -55,6 +61,47 @@ static class Program
         _ = Task.Run(() => { stopEvent.WaitOne(); stop.Cancel(); });
         return Run(folder, IPAddress.Parse(options.GetValueOrDefault("bind") ?? "0.0.0.0"), options.ContainsKey("fresh"),
             options.GetValueOrDefault("log"), stop.Token).GetAwaiter().GetResult();
+    }
+
+    /// <summary>The x.y.z of a FakeCar.exe file; null when it cannot be read.</summary>
+    public static Version? VersionOf(string? exe)
+    {
+        try
+        {
+            if (exe is null || !File.Exists(exe)) return null;
+            var info = System.Diagnostics.FileVersionInfo.GetVersionInfo(exe);
+            return new Version(info.FileMajorPart, info.FileMinorPart, info.FileBuildPart);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    public static Version Mine => VersionOf(Environment.ProcessPath) ?? new Version(0, 0, 0);
+
+    /// <summary>
+    /// Every other running Fake Car is older than this one: asks them to stop (their car stops with them), waits until they
+    /// are gone and takes their place. A same or newer one keeps running (this start then just shows its window).
+    /// </summary>
+    static bool OlderOneStopped(EventWaitHandle stopEvent)
+    {
+        var me = Environment.ProcessId;
+        var others = System.Diagnostics.Process.GetProcessesByName("FakeCar").Where(p => p.Id != me).ToList();
+        if (others.Count == 0) return false;
+        foreach (var other in others)
+        {
+            string? path;
+            try { path = other.MainModule?.FileName; }
+            catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException) { return false; }
+            if (VersionOf(path) is not { } theirs || theirs >= Mine) return false;
+        }
+        stopEvent.Set();
+        foreach (var other in others)
+            if (!other.WaitForExit(15_000)) return false;
+        // The stop signal outlives the old copy while this handle holds it: cleared, so this copy does not stop itself.
+        stopEvent.Reset();
+        return true;
     }
 
     /// <summary>Loads the car and answers on the network until stopped. 0 = stopped, 1 = failed (see the log).</summary>

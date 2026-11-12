@@ -51,6 +51,28 @@ static class Options
         }
     }
 
+    /// <summary>
+    /// "Start with Windows" set by an older Fake Car (or one whose folder is gone) now starts this newer one, so the old
+    /// version does not come back at the next sign-in.
+    /// </summary>
+    public static void FollowNewest()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKey, writable: true);
+            if (key?.GetValue(RunName) is not string line || line.Contains(Environment.ProcessPath ?? "?", StringComparison.OrdinalIgnoreCase)) return;
+            var start = line.IndexOf('"');
+            var end = start >= 0 ? line.IndexOf('"', start + 1) : -1;
+            var old = end > start ? line[(start + 1)..end] : null;
+            if (Program.VersionOf(old) is { } theirs && theirs >= Program.Mine) return;
+            key.SetValue(RunName, $"\"{Environment.ProcessPath}\" --background");
+        }
+        catch (Exception e) when (e is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+        {
+            // Left as it was: the old copy starts at sign-in and gives way when this one opens.
+        }
+    }
+
     static bool Get(string key, bool otherwise) => Values.TryGetValue(key, out var v) ? v == "1" : otherwise;
 
     static void Set(string key, bool value) => Put(key, value ? "1" : "0");

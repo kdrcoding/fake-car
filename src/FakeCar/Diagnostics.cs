@@ -269,6 +269,20 @@ sealed class Diagnostics(Car car, Log log)
         }
     }
 
+    /// <summary>
+    /// 19 06: the extended data records a BMW module keeps per fault, each one byte: 01 condition byte, 02 how often it
+    /// occurred, 03 healing counter (drive cycles without the fault; 0 while it is present). FF = all of them, as
+    /// ISTA's and E-Sys MAX's fault details ask. A real module answers every record, so testers expect all three.
+    /// </summary>
+    static byte[] Extended(Fault f, byte record, byte[] req)
+    {
+        var present = (f.Status & 0x01) != 0;
+        var records = new (byte Id, byte Value)[] { (0x01, 0x00), (0x02, f.Count), (0x03, present ? (byte)0 : (byte)20) };
+        var picked = records.Where(r => record == 0xFF || r.Id == record).ToList();
+        if (picked.Count == 0) return [0x7F, 0x19, RequestOutOfRange];
+        return [0x59, 0x06, req[2], req[3], req[4], f.Status, .. picked.SelectMany(r => new[] { r.Id, r.Value })];
+    }
+
     static byte[] ReadFaults(Ecu ecu, byte[] req)
     {
         if (req.Length < 2) return [0x7F, 0x19, IncorrectLength];
@@ -287,7 +301,7 @@ sealed class Diagnostics(Car car, Log log)
                     var code = req[2] << 16 | req[3] << 8 | req[4];
                     var f = ecu.Faults.FirstOrDefault(x => x.Code == code);
                     if (f is null) return [0x7F, 0x19, RequestOutOfRange];
-                    if (req[1] == 0x06) return [0x59, 0x06, req[2], req[3], req[4], f.Status, 0x02, f.Count];
+                    if (req[1] == 0x06) return Extended(f, req.Length > 5 ? req[5] : (byte)0xFF, req);
                     // Snapshot: mileage (3 bytes, km) and a time stamp, as BMW modules give it.
                     return [0x59, 0x04, req[2], req[3], req[4], f.Status, 0x01, 0x02, 0x17, 0x00,
                         (byte)(f.Mileage >> 16), (byte)(f.Mileage >> 8), (byte)f.Mileage, 0x17, 0x01, 0x00, 0x00, 0x12, 0x34];

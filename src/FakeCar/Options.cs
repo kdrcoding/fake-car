@@ -11,8 +11,31 @@ static class Options
     const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     const string RunName = "Fake Car";
 
-    /// <summary>Closing the window while a car runs keeps it running next to the clock.</summary>
-    public static bool KeepRunning { get => Get("KEEP_RUNNING", true); set => Set("KEEP_RUNNING", value); }
+    /// <summary>
+    /// Closing the window while a car runs keeps it running next to the clock. Off by default since 1.6.9 (owner
+    /// 2026-11-14): the window's X looked like it closed Fake Car while the car quietly kept running.
+    /// </summary>
+    public static bool KeepRunning { get => Get("KEEP_RUNNING", false); set => Set("KEEP_RUNNING", value); }
+
+    /// <summary>Where the newest Fake Car on this PC lives (HKCU\Software\FakeCar Path + Version): E-Sys MAX's Practice car
+    /// starts that one, so a copy downloaded from GitHub is used instead of an older one E-Sys MAX keeps.</summary>
+    const string HomeKey = @"Software\FakeCar";
+
+    public static void RememberWhereIAm()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(HomeKey, writable: true);
+            if (key.GetValue("Path") is string old && !old.Equals(Environment.ProcessPath, StringComparison.OrdinalIgnoreCase)
+                && Program.VersionOf(old) is { } theirs && theirs > Program.Mine) return;
+            key.SetValue("Path", Environment.ProcessPath ?? "");
+            key.SetValue("Version", Program.Mine.ToString(3));
+        }
+        catch (Exception e) when (e is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+        {
+            // Not written: E-Sys MAX then uses its own copy.
+        }
+    }
 
     /// <summary>Opening Fake Car starts the car that ran last.</summary>
     public static bool StartLastCar { get => Get("START_LAST_CAR", false); set => Set("START_LAST_CAR", value); }

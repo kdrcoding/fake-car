@@ -34,7 +34,10 @@ static class Program
             if (!createdNew && picture is null && OlderOneStopped(stopEvent))
                 createdNew = true;
             if (createdNew && picture is null)
+            {
                 Options.FollowNewest();
+                Options.RememberWhereIAm();
+            }
             if (!createdNew && picture is null)
             {
                 // A second start brings the running window to the front (also when it sits next to the clock).

@@ -58,7 +58,7 @@ Erase the instrument cluster's coding data in **Practice**, connect, and open **
 
 ## Runs next to the clock
 
-Close the window and the car keeps running. Click the Fake Car icon next to the clock to open the window, or right-click it for the menu. Starting `FakeCar.exe` again brings the open window to the front.
+Closing the window quits Fake Car and switches the car off. To keep the car on with the window closed, tick **Keep the car running when I close the window** in Options; then click the Fake Car icon next to the clock to open the window, or right-click it for the menu. Starting `FakeCar.exe` again brings the open window to the front.
 
 <table>
 <tr>
@@ -73,7 +73,7 @@ Close the window and the car keeps running. Click the Fake Car icon next to the 
 
 | Option | What it does |
 |---|---|
-| Keep the car running when I close the window | On by default. Off: closing the window switches the car off. |
+| Keep the car running when I close the window | Off by default: closing the window quits Fake Car. On: the car keeps running next to the clock. |
 | Start the last car when Fake Car opens | The car you used last starts by itself. |
 | Start Fake Car with Windows | Fake Car starts next to the clock, without the window, with the last car on. |
 | Tell me when a tester connects | A short note next to the clock while the window is closed. The window always shows it. |

@@ -143,7 +143,11 @@ sealed class PickerForm : Window
         else if (!building && list.Items.Cast<Model>().FirstOrDefault(m => Path.GetFileName(m.Folder).Equals(Options.LastCar, StringComparison.OrdinalIgnoreCase)) is { } last)
             menu.Items.Add($"Start {last.Name}", null, async (_, _) => { list.SelectedItem = last; await StartSelected(); });
         if ((runningModel ?? Selected) is { } car && File.Exists(Path.Combine(car.Folder, "fakecar.log")))
+        {
             menu.Items.Add("Open the car's log", null, (_, _) => Open(Path.Combine(car.Folder, "fakecar.log")));
+            if (File.Exists(Path.Combine(car.Folder, "missing.txt")))
+                menu.Items.Add("Open what the tester missed", null, (_, _) => Open(Path.Combine(car.Folder, "missing.txt")));
+        }
         menu.Items.Add("Options", null, (_, _) => ShowOptions());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Quit Fake Car", null, (_, _) => Quit());

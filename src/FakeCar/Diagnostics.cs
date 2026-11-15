@@ -95,6 +95,7 @@ sealed class Diagnostics(Car car, Log log)
             if (data is null && !ecu.Dids.TryGetValue(did, out data))
             {
                 log.Line($"  MISSING DID {did:X4} at {ecu.Name} [{ecu.Address:X2}]");
+                if (req.Length > 3) log.Gap($"{ecu.Name} [{ecu.Address:X2}] read DID {did:X4} -> missing (asked with others)", Convert.ToHexString(req));
                 continue;
             }
             answer.Add(req[i]);

@@ -181,6 +181,8 @@ sealed class Log : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         writer = new StreamWriter(path, append: true) { AutoFlush = true };
         writer.WriteLine($"Fake Car {PickerForm.Version} by esysmax, {DateTime.Now:yyyy-MM-dd}");
+        gapsPath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(path))!, "missing.txt");
+        try { File.Delete(gapsPath); } catch (IOException) { }
     }
 
     public void Line(string text)
@@ -188,5 +190,43 @@ sealed class Log : IDisposable
         lock (gate) writer.WriteLine($"{DateTime.Now:HH:mm:ss.fff} {text}");
     }
 
-    public void Dispose() => writer.Dispose();
+    // What a tester asked for that this car could not answer, once per kind with a count (missing.txt next to the log).
+    readonly string? gapsPath;
+    readonly Dictionary<string, (int Count, string First, string Example)> gaps = [];
+
+    /// <summary>Notes one unanswered request; the list file is rewritten when a new kind shows up.</summary>
+    public void Gap(string what, string example)
+    {
+        if (gapsPath is null) return;
+        lock (gate)
+        {
+            var fresh = !gaps.TryGetValue(what, out var g);
+            gaps[what] = fresh ? (1, $"{DateTime.Now:HH:mm:ss}", example) : (g.Count + 1, g.First, g.Example);
+            if (fresh) WriteGaps();
+        }
+    }
+
+    void WriteGaps()
+    {
+        try
+        {
+            var lines = new List<string>
+            {
+                $"Fake Car {PickerForm.Version} - what the tester asked for and this car could not answer",
+                $"since {started:yyyy-MM-dd HH:mm}, {gaps.Count} kinds. Full requests: fakecar.log",
+                "",
+            };
+            lines.AddRange(gaps.OrderBy(x => x.Key).Select(x => $"{x.Value.Count,5}x  {x.Key}   (first {x.Value.First}, e.g. {x.Value.Example})"));
+            File.WriteAllLines(gapsPath!, lines);
+        }
+        catch (IOException) { }
+    }
+
+    readonly DateTime started = DateTime.Now;
+
+    public void Dispose()
+    {
+        lock (gate) if (gaps.Count > 0) WriteGaps();
+        writer.Dispose();
+    }
 }

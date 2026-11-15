@@ -107,7 +107,7 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, 
         }
     }
 
-    async Task DiagAsync(NetworkStream stream, byte[] body, CancellationToken stop)
+    internal async Task DiagAsync(Stream stream, byte[] body, CancellationToken stop)
     {
         var source = body[0];
         var target = body[1];
@@ -123,6 +123,11 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, 
         IEnumerable<Ecu> who = target == Functional
             ? car.Ecus.Values
             : car.Ecus.TryGetValue(target, out var one) ? [one] : [];
+        if (target != Functional && !car.Ecus.ContainsKey(target))
+        {
+            log.Line($"   no module at {target:X2}");
+            log.Gap($"no module at address {target:X2}", Hex(request));
+        }
         foreach (var ecu in who)
         {
             if (car.Silent.Contains(ecu.Address))
@@ -132,12 +137,14 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, 
             }
             var answer = diagnostics.Answer(ecu, request, target == Functional);
             if (answer is null) continue;
+            if (answer is [0x7F, _, var nrc])
+                log.Gap($"{ecu.Name} [{ecu.Address:X2}] {Kind(request)} -> refused {nrc:X2} ({Nrc(nrc)})", Hex(request));
             log.Line($"   {ecu.Address:X2}<- {Hex(answer)}");
             await SendAsync(stream, ControlDiag, [ecu.Address, source, .. answer], stop);
         }
     }
 
-    static async Task SendAsync(NetworkStream stream, ushort control, byte[] payload, CancellationToken stop)
+    static async Task SendAsync(Stream stream, ushort control, byte[] payload, CancellationToken stop)
     {
         var frame = new byte[6 + payload.Length];
         BinaryPrimitives.WriteInt32BigEndian(frame, payload.Length);
@@ -190,6 +197,28 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, 
             await udp.SendAsync(frame, got.RemoteEndPoint, stop);
         }
     }
+
+    /// <summary>The request up to its ID: service + sub-function / DID / routine number, so repeats count as one.</summary>
+    static string Kind(byte[] r) => r[0] switch
+    {
+        0x22 or 0x2E when r.Length >= 3 => $"{(r[0] == 0x22 ? "read" : "write")} DID {r[1]:X2}{r[2]:X2}",
+        0x31 when r.Length >= 4 => $"routine {r[1]:X2} {r[2]:X2}{r[3]:X2}",
+        0x2F when r.Length >= 3 => $"IO control {r[1]:X2}{r[2]:X2}",
+        _ => $"service {Convert.ToHexString(r, 0, Math.Min(r.Length, 2))}",
+    };
+
+    static string Nrc(byte nrc) => nrc switch
+    {
+        0x11 => "service not supported",
+        0x12 => "sub-function not supported",
+        0x13 => "wrong length",
+        0x22 => "conditions not correct",
+        0x24 => "wrong order",
+        0x31 => "not known / out of range",
+        0x33 => "locked",
+        0x72 => "programming failure",
+        _ => "refused",
+    };
 
     static string Hex(byte[] b) => b.Length > 40 ? Convert.ToHexString(b, 0, 40) + $"... ({b.Length} bytes)" : Convert.ToHexString(b);
 }

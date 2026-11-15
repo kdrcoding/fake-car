@@ -179,4 +179,24 @@ public sealed class ServiceTests : IDisposable
     // Kept as it was: battery registration routine.
     [Fact]
     public void BatteryRegister() => Assert.Equal(H("7101F03000"), Ask(0x12, "3101F030 001000"));
+
+    // f) 22 D113: cluster clock, from this PC's clock, moved by CLOCK_DAYS_OFF.
+    static DateTime ClockOf(byte[] answer)
+    {
+        Assert.Equal(H("62D113"), answer[..3]);
+        Assert.Equal(3 + 8, answer.Length);
+        return new DateTime(answer[8] << 8 | answer[9], answer[7], answer[6], answer[3], answer[4], answer[5]);
+    }
+
+    [Fact]
+    public void ClusterClockIsThisPcsClock() =>
+        Assert.InRange((ClockOf(Ask(0x60, "22D113")!) - DateTime.Now).TotalSeconds, -5, 5);
+
+    [Fact]
+    public void ClusterClockCanBeOff()
+    {
+        MakeCar("DME-MEVD1728-DME1", "DSC-PREMIUM9-DSC", "KOMBI-L6BO-KOMBI", "CLOCK_DAYS_OFF=-400\n");
+        Assert.InRange((ClockOf(Ask(0x60, "22D113")!) - DateTime.Now.AddDays(-400)).TotalSeconds, -5, 5);
+        Assert.Equal(H("7F2231"), Ask(0x12, "22D113"));
+    }
 }

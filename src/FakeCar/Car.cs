@@ -98,6 +98,8 @@ sealed class Car
     // Practice problems (problems.txt in the car folder, set in the Practice window).
     /// <summary>Modules that do not answer at all, as if unplugged.</summary>
     public HashSet<byte> Silent { get; } = [];
+    /// <summary>Days the cluster clock is off from this PC's clock (CLOCK_DAYS_OFF in car.txt), to practise a wrong car date.</summary>
+    public int ClockDaysOff { get; set; }
     /// <summary>Modules that refuse coding writes.</summary>
     public HashSet<byte> CodingFails { get; } = [];
     /// <summary>The connection drops once, at the third coding write.</summary>

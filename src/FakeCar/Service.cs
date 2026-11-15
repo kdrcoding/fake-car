@@ -76,6 +76,7 @@ static class Service
             dme.Dids[BatterySensor] = SensorRecord(20.0, mv / 1000.0, -0.48);
             dme.Dids[BatteryState] = StateRecord(ah, health: 85, charge: low ? 35 : 80);
         }
+        car.ClockDaysOff = Int(settings, "CLOCK_DAYS_OFF", 0);
         Fill(car, settings, Cluster, ClusterIdent, ClusterItems);
         Fill(car, settings, Engine, EngineIdent, EngineItems);
         Fill(car, settings, Brakes, BrakesIdent, BrakesItems);
@@ -88,6 +89,12 @@ static class Service
         ecu.Dids[Ident] = settings.TryGetValue($"F150_{address:X2}", out var own) && own.Length == 6 ? Convert.FromHexString(own) : ident(ecu);
         ecu.Dids[Cbs] = [.. items.SelectMany(i => Convert.FromHexString(i.Replace(" ", "", StringComparison.Ordinal)))];
     }
+
+    /// <summary>Cluster clock (22 D113, KOMBI_UHRZEIT_DATUM): hour, minute, second, day, month, year (2 bytes), format.</summary>
+    public const ushort Clock = 0xD113;
+
+    public static byte[] ClockRecord(DateTime now) =>
+        [(byte)now.Hour, (byte)now.Minute, (byte)now.Second, (byte)now.Day, (byte)now.Month, (byte)(now.Year >> 8), (byte)now.Year, 0x00];
 
     static int Int(Dictionary<string, string> settings, string key, int fallback) =>
         int.TryParse(settings.GetValueOrDefault(key), NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : fallback;

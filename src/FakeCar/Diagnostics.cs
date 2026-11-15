@@ -90,6 +90,7 @@ sealed class Diagnostics(Car car, Log log)
             {
                 0xF186 => [ecu.Session],
                 0xF100 => [ecu.Session, 0x00, 0x00, 0x00],
+                Service.Clock when ecu.Address == Service.Cluster => Service.ClockRecord(DateTime.Now.AddDays(car.ClockDaysOff)),
                 _ => null,
             };
             if (data is null && !ecu.Dids.TryGetValue(did, out data))

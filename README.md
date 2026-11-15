@@ -80,6 +80,7 @@ Closing the window quits Fake Car and switches the car off. To keep the car on w
 | Let other PCs on the network connect | On by default. Off: only E-Sys on this PC finds and connects to the car (by its VIN or with the gateway URL `tcp://127.0.0.1:6801`); other PCs are turned away. |
 | PSdZData folder | The PSdZData the cars are built from. Automatic: the one E-Sys uses. Choose another, older or newer: the cars are built again from it on their next start. |
 | E-Sys folder | The E-Sys the builder runs with. Automatic: the newest found. |
+| Use a VIN that ISTA accepts | Off by default. On: a car that has `VIN_ISTA` in its `car.txt` (the F10 does) shows that VIN, so ISTA accepts it. |
 
 Options are kept in `%APPDATA%\FakeCar\options.txt`, so a newer Fake Car keeps them.
 
@@ -105,7 +106,9 @@ Options are kept in `%APPDATA%\FakeCar\options.txt`, so a newer Fake Car keeps t
 | Module reset | Yes |
 | Service reset (CBS) and battery registration with EDIABAS service tools | Instrument cluster, engine computer and brake module answer; resets are kept for next time |
 
-Tested with E-Sys 25.10: connecting, reading and writing FA, FP and I-steps, SVT, coding, and FSC actions (status, VIN, SID on the head unit). TAL calculation works on F- and G-series cars (F30 practice car: the cluster is planned for flashing; G80: up to date, nothing to flash). The `CAFD_FFFFFFFF` practice was fixed in E-Sys 25.10 with Detect CAF for SWE and Code. Running a full flash (Execute) is not tested yet. ISTA finds cars the same way over the network, but it is not tested yet either.
+Tested with E-Sys 25.10: connecting, reading and writing FA, FP and I-steps, SVT, coding, and FSC actions (status, VIN, SID on the head unit). TAL calculation works on F- and G-series cars (F30 practice car: the cluster is planned for flashing; G80: up to date, nothing to flash). The `CAFD_FFFFFFFF` practice was fixed in E-Sys 25.10 with Detect CAF for SWE and Code. Running a full flash (Execute) is not tested yet.
+
+ISTA 4.61 identifies the F10 practice car over the network: it reads the vehicle details, every module and the fault memory with each fault's details. Tick **Use a VIN that ISTA accepts** in Options first: ISTA checks the VIN against its own list and turns made-up VINs away. Functions ISTA runs in its own extra sessions (CBS, clock, battery) depend on your ISTA setup.
 
 ## Car models
 
@@ -168,6 +171,8 @@ Copy a car folder and change two files:
 
 To practise spotting a rolled-back car, add `KM_CLUSTER=30000` to `car.txt`: the instrument cluster shows 30,000 km while the other modules keep the real `KM`.
 
+To practise a wrong car date, add `CLOCK_DAYS_OFF=-400` to `car.txt`: the instrument cluster's clock runs that many days off this PC's clock.
+
 To have something to flash, add `OUTDATED=60` (module addresses, comma separated) to `car.txt`: those modules keep the software they were built with.
 
 Start it in `FakeCar.exe`; it is built on the first start. To build by hand:
@@ -186,7 +191,7 @@ FakeCar.exe --stop
 
 `--background` starts Fake Car next to the clock with the last car on, as **Start with Windows** does. `--stop` switches off and closes any Fake Car.
 
-Every request and answer is written to `fakecar.log` in the car's folder.
+Every request and answer is written to `fakecar.log` in the car's folder. What a tester asked for that the car does not know yet goes to `missing.txt` next to it (right-click the Fake Car icon > **Open what the tester missed**).
 
 ## Good to know
 

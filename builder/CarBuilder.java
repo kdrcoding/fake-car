@@ -52,6 +52,7 @@ import java.util.regex.Pattern;
  */
 public final class CarBuilder {
     static final PrintStream out = System.out;
+    static final String NO_SECURITY = "your PSdZData is incomplete: its security files (psdzdata\\security) are missing or do not work. Use a full PSdZData, or pick the right PSdZData folder in Options";
 
     public static void main(String[] a) {
         try {
@@ -111,6 +112,14 @@ public final class CarBuilder {
         if (modules.isEmpty()) throw new IllegalArgumentException("no modules for type " + order.type + " at " + build + ": its build date is probably outside the time this type was made");
         progress(15, "Starting PSdZ (the slow part, longest the first time)");
 
+        // PSdZ unlocks its encrypted data with the files in psdzdata\security. When they are missing it only logs
+        // "ignored failure in security init" and fails much later with "Invalid call for decryptVerifyXML. Please call
+        // init() method of %0 first". Say what is wrong before that.
+        File sec = new File(data, "psdzdata\\security");
+        boolean setA = new File(sec, "sec_security.lic").isFile() && new File(sec, "sec_certificates.pem").isFile() && new File(sec, "sec_keyreference.xml").isFile();
+        boolean setB = new File(sec, "sec_auth_l3.xml").isFile() && new File(sec, "sec_auth_l4.xml").isFile() && new File(sec, "sec_transkeys.xml").isFile();
+        if (!setA && !setB) throw new IllegalArgumentException(NO_SECURITY + " (" + sec + " has no sec_ files).");
+
         long t = System.currentTimeMillis();
         Configuration conf = ServiceLocator.locate(Configuration.class);
         conf.setRootDirectory(data);
@@ -140,7 +149,16 @@ public final class CarBuilder {
         fa.parseXML(faXml.substring(faXml.indexOf("<ns2:fa>"), faXml.indexOf("</ns2:fa>") + 9).replace("ns2:", ""));
         modules = target(logic, modules, fa, build, current, outdated);
         write(new File(car, "modules.txt"), String.join("\n", modules) + "\n");
-        FP fp = logic.generateFP(fa);
+        FP fp;
+        try {
+            fp = logic.generateFP(fa);
+        } catch (RuntimeException e) {
+            // Security files there but not usable (broken, or from another PSdZData): PSdZ's own words mean nothing to a user.
+            for (Throwable c = e; c != null; c = c.getCause())
+                if (String.valueOf(c.getMessage()).contains("decryptVerifyXML"))
+                    throw new IllegalArgumentException(NO_SECURITY + ": PSdZ could not open its security files.", e);
+            throw e;
+        }
         write(new File(car, "FP.xml"), fp.getAsXML());
         write(new File(car, "vcm.txt"), "FA\t" + hex(fa.getAsStream()) + "\nFP\t" + hex(fp.getAsStream()) + "\n");
 

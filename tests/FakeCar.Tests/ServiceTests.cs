@@ -47,7 +47,13 @@ public sealed class ServiceTests : IDisposable
     public void IdentF10(byte address, string answer) => Assert.Equal(H(answer), Ask(address, "22F150"));
 
     [Fact]
-    public void IdentOnlyOnServiceModules() => Assert.Equal(H("7F2231"), Ask(0x13, "22F150"));
+    public void IdentOnOtherModulesFromThisPcsTable()
+    {
+        // Other modules answer from the EDIABAS table when this PC has one (JobFiles), else they do not know F150.
+        var answer = Ask(0x13, "22F150")!;
+        if (JobFiles.Table.Count == 0) Assert.Equal(H("7F2231"), answer);
+        else Assert.Equal(H("62F150"), answer[..3]);
+    }
 
     [Fact]
     public void IdentGSeries()

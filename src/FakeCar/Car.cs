@@ -170,6 +170,7 @@ sealed class Car
         }
         // Battery: voltage at the engine computer (mV), the battery sensor and battery state; service items (CBS);
         // which job file the cluster, engine computer and brake module answer to (22 F150).
+        JobFiles.Fill(car, settings); // every module, from this PC's EDIABAS table; Service keeps its proven ones
         Service.Fill(car, settings, problems);
 
         // Terminal status at the body module (CAS on F-series, BDC on G): 0x0A = ignition on (KL15).

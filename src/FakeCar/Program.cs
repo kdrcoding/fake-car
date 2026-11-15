@@ -130,6 +130,7 @@ static class Program
     public static async Task<int> Run(string folder, IPAddress bind, bool fresh, string? logPath, CancellationToken stop, Action<IPEndPoint?>? testers = null)
     {
         using var log = new Log(logPath ?? Path.Combine(folder, "fakecar.log"));
+        Car.UseIstaVin = Options.IstaVin;
         try
         {
             var car = Car.Load(folder);

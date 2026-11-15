@@ -346,16 +346,7 @@ sealed class PickerForm : Window
 
     /// <summary>A VIN with a valid check digit that no real car has: "DEMC" stands where the model code would be.</summary>
     internal static string MadeUpVin(string maker)
-    {
-        int[] weights = [8, 7, 6, 5, 4, 3, 2, 10, 0, 9, 8, 7, 6, 5, 4, 3, 2];
-        var vin = (maker + "DEMC5_LK" + Random.Shared.Next(100000, 999999)).ToCharArray();
-        var sum = 0;
-        for (var i = 0; i < 17; i++) if (i != 8) sum += Value(vin[i]) * weights[i];
-        vin[8] = sum % 11 == 10 ? 'X' : (char)('0' + sum % 11);
-        return new string(vin);
-
-        static int Value(char c) => char.IsDigit(c) ? c - '0' : "ABCDEFGH".Contains(c) ? c - 'A' + 1 : "JKLMN".Contains(c) ? c - 'J' + 1 : c == 'P' ? 7 : c == 'R' ? 9 : c - 'S' + 2;
-    }
+        => Car.WithCheckDigit(maker + "DEMC5_LK" + Random.Shared.Next(100000, 999999));
 
     static IEnumerable<Model> Models(string carsFolder)
     {
@@ -379,7 +370,7 @@ sealed class PickerForm : Window
         if (settings.TryGetValue("DATA", out var data) && Builder.IsData(Builder.Folders().Data) && !Builder.SameFolder(data, Builder.Folders().Data)) modules = 0;
         // The E-Sys target is the PSdZData project of the car's I-step: F020-26-07-530 is F020_26_07_530_...
         var target = settings.GetValueOrDefault("ISTEP_CURRENT", "").Replace('-', '_');
-        return new Model(dir, settings.GetValueOrDefault("NAME", Path.GetFileName(dir)), settings.GetValueOrDefault("VIN", ""), modules, target);
+        return new Model(dir, settings.GetValueOrDefault("NAME", Path.GetFileName(dir)), Options.IstaVin && settings.GetValueOrDefault("VIN_ISTA", "") is { Length: 17 } ista ? Car.WithCheckDigit(ista) : settings.GetValueOrDefault("VIN", ""), modules, target);
     }
 
     void DrawModel(object? sender, DrawItemEventArgs e)

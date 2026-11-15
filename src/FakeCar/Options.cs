@@ -67,6 +67,9 @@ static class Options
     /// <summary>A note next to the clock when a tester connects while the window is hidden.</summary>
     public static bool Notify { get => Get("NOTIFY", true); set => Set("NOTIFY", value); }
 
+    /// <summary>Answer with the car's VIN_ISTA (car.txt) instead of its made-up VIN: ISTA only knows real BMW VINs.</summary>
+    public static bool IstaVin { get => Get("ISTA_VIN", false); set => Set("ISTA_VIN", value); }
+
     /// <summary>The folder holding psdzdata the cars are built from; empty = the one E-Sys uses.</summary>
     public static string DataFolder { get => Values.GetValueOrDefault("DATA_FOLDER", ""); set => Put("DATA_FOLDER", value); }
 
@@ -175,6 +178,9 @@ sealed class OptionsForm : Window
         Add(rows, "Tell me when a tester connects",
             "A short note next to the clock while the window is closed.",
             Options.Notify, v => Options.Notify = v);
+        Add(rows, "Use a VIN that ISTA accepts",
+            "ISTA only knows real BMW VINs. On: cars that have one answer with a real-looking VIN (it could match a real car; it stays on this PC). Start the car again after changing this.",
+            Options.IstaVin, v => Options.IstaVin = v);
         Add(rows, "Let other PCs on the network connect",
             "Off: only E-Sys on this PC can connect, with the gateway URL tcp://127.0.0.1:6801.",
             Options.Network, v => Options.Network = v);

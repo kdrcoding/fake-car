@@ -103,10 +103,29 @@ sealed class Car
     /// <summary>The connection drops once, at the third coding write.</summary>
     public bool DropDuringCoding { get; private set; }
 
+    /// <summary>On: answer with car.txt VIN_ISTA (a "?" in place 9 becomes the check digit), when the car has one.</summary>
+    public static bool UseIstaVin { get; set; }
+
+    static string VinFor(Dictionary<string, string> settings) =>
+        UseIstaVin && settings.TryGetValue("VIN_ISTA", out var ista) && ista.Length == 17 ? WithCheckDigit(ista) : settings["VIN"];
+
+    /// <summary>The VIN with its check digit (place 9) worked out, as every 17-character VIN carries it.</summary>
+    public static string WithCheckDigit(string vin)
+    {
+        int[] weights = [8, 7, 6, 5, 4, 3, 2, 10, 0, 9, 8, 7, 6, 5, 4, 3, 2];
+        var c = vin.ToUpperInvariant().ToCharArray();
+        var sum = 0;
+        for (var i = 0; i < 17; i++) if (i != 8) sum += Value(c[i]) * weights[i];
+        c[8] = sum % 11 == 10 ? 'X' : (char)('0' + sum % 11);
+        return new string(c);
+
+        static int Value(char c) => char.IsDigit(c) ? c - '0' : "ABCDEFGH".Contains(c) ? c - 'A' + 1 : "JKLMN".Contains(c) ? c - 'J' + 1 : c == 'P' ? 7 : c == 'R' ? 9 : c - 'S' + 2;
+    }
+
     public static Car Load(string folder)
     {
         var settings = Settings(folder);
-        var car = new Car { Vin = settings["VIN"], Folder = folder };
+        var car = new Car { Vin = VinFor(settings), Folder = folder };
         var problems = Practice.Problems(folder);
         car.Silent.UnionWith(Practice.Addresses(problems.GetValueOrDefault(Practice.SilentKey, "")));
         car.CodingFails.UnionWith(Practice.Addresses(problems.GetValueOrDefault(Practice.CodingFailsKey, "")));

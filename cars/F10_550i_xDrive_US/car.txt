@@ -1,6 +1,8 @@
 # Fake Car settings (made-up VIN: valid check digit, not a real car)
 NAME=BMW F10 550i xDrive M Sport (US, 2015)
 VIN=WBADEMC57FZ000550
+# Real-pattern VIN (type code KP9C) for ISTA, used only with Options > Use a VIN that ISTA accepts
+VIN_ISTA=WBAKP9C5?FD692550
 ISTEP_SHIPMENT=F010-15-07-503
 ISTEP_LAST=F010-23-07-530
 ISTEP_CURRENT=F010-26-07-530

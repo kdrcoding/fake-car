@@ -21,16 +21,27 @@ static partial class JobFiles
     {
         get
         {
-            lock (gate) return table ??= Load(Folders().Select(f => Path.Combine(f, "T_GRTB.prg")).FirstOrDefault(File.Exists));
+            lock (gate) return table ??= OnlyThere(Load(Folders().Select(f => Path.Combine(f, "T_GRTB.prg")).FirstOrDefault(File.Exists)));
         }
     }
 
+    /// <summary>Drops rows whose job file is not in that folder (ISTA ships CAS4_2 but not CAS4): a tester could not use them.</summary>
+    static List<Row> OnlyThere(List<Row> rows)
+    {
+        if (folder is null) return rows;
+        var have = Directory.EnumerateFiles(folder, "*.prg").Select(f => Path.GetFileNameWithoutExtension(f).ToUpperInvariant()).ToHashSet();
+        return rows.Where(r => have.Contains(r.Sgbd.ToUpperInvariant())).ToList();
+    }
+
+    static string? folder;
+
     static IEnumerable<string> Folders()
     {
-        if (Environment.GetEnvironmentVariable("EDIABAS_PATH") is { Length: > 0 } env) yield return Path.Combine(env, "Ecu");
-        yield return @"C:\EDIABAS\Ecu";
+        // ISTA's own job files first: it is the tester that picks job files by this answer.
         var pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
         yield return Path.Combine(pf, @"BMW\ISPI\TRIC\ISTA\Ecu");
+        if (Environment.GetEnvironmentVariable("EDIABAS_PATH") is { Length: > 0 } env) yield return Path.Combine(env, "Ecu");
+        yield return @"C:\EDIABAS\Ecu";
     }
 
     /// <summary>EDIABAS object files are XOR F7; the table rows read "AA IIIIII", job file, group, series.</summary>
@@ -38,6 +49,7 @@ static partial class JobFiles
     {
         var rows = new List<Row>();
         if (path is null) return rows;
+        folder = Path.GetDirectoryName(path);
         try
         {
             var bytes = File.ReadAllBytes(path);

@@ -24,6 +24,25 @@ static class Program
             return 0;
         }
 
+        // A newer Fake Car on this PC takes over: this older copy starts it (same switches) and closes.
+        if (!options.ContainsKey("car") && !options.ContainsKey("picture") && Options.NewerCopy() is { } newer)
+        {
+            try
+            {
+                using var _ = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(newer)
+                {
+                    UseShellExecute = false,
+                    WorkingDirectory = Path.GetDirectoryName(newer)!,
+                    Arguments = options.ContainsKey("background") ? "--background" : "",
+                });
+                return 0;
+            }
+            catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
+            {
+                // Could not start it: this copy runs as before.
+            }
+        }
+
         using var stopEvent = new EventWaitHandle(false, EventResetMode.ManualReset, StopEventName, out var createdNew);
         if (!options.ContainsKey("car"))
         {

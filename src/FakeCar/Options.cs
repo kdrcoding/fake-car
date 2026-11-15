@@ -21,6 +21,27 @@ static class Options
     /// starts that one, so a copy downloaded from GitHub is used instead of an older one E-Sys MAX keeps.</summary>
     const string HomeKey = @"Software\FakeCar";
 
+    /// <summary>
+    /// A newer Fake Car recorded on this PC (it ran there once), or null. An older copy started by an older E-Sys MAX or
+    /// an old shortcut hands over to it, so a downloaded update is used everywhere (owner 2026-11-14).
+    /// </summary>
+    public static string? NewerCopy()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(HomeKey);
+            if (key?.GetValue("Path") is not string path || path.Equals(Environment.ProcessPath, StringComparison.OrdinalIgnoreCase)) return null;
+            if (!string.Equals(Path.GetFileName(path), "FakeCar.exe", StringComparison.OrdinalIgnoreCase) || !File.Exists(path)) return null;
+            var info = System.Diagnostics.FileVersionInfo.GetVersionInfo(path);
+            if (info.ProductName != "Fake Car" || info.CompanyName != "esysmax") return null;
+            return Program.VersionOf(path) is { } theirs && theirs > Program.Mine ? path : null;
+        }
+        catch (Exception e) when (e is UnauthorizedAccessException or System.Security.SecurityException or IOException or ArgumentException)
+        {
+            return null;
+        }
+    }
+
     public static void RememberWhereIAm()
     {
         try

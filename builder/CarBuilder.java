@@ -55,11 +55,17 @@ public final class CarBuilder {
     static final String NO_SECURITY = "your PSdZData is incomplete: its security files (psdzdata\\security) are missing or do not work. Use a full PSdZData, or pick the right PSdZData folder in Options";
 
     public static void main(String[] a) {
+        // PSdZ's security init fails on a Turkish Windows ("i".toUpperCase() is "İ" there) and E-Sys MAX users then got
+        // "Invalid call for decryptVerifyXML" on every build (report R-4F8CD9, 2026-11-20). Set before any PSdZ class loads.
+        java.util.Locale.setDefault(java.util.Locale.US);
         try {
             run(a);
         } catch (Throwable e) {
+            // The builder's own words when it threw them (they say what to do); PSdZ's innermost message otherwise.
             Throwable c = e;
-            while (c.getCause() != null) c = c.getCause();
+            boolean ours = e instanceof IllegalArgumentException && e.getStackTrace().length > 0
+                    && CarBuilder.class.getName().equals(e.getStackTrace()[0].getClassName());
+            if (!ours) while (c.getCause() != null) c = c.getCause();
             e.printStackTrace(System.err);
             out.println("Failed: " + String.valueOf(c.getMessage() != null ? c.getMessage() : c).split("\\R")[0]);
             System.exit(1);

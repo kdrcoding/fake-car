@@ -65,7 +65,11 @@ echo Builder Java: "%JAVA%" %HEAP%
 
 rem PSdZ looks for its settings next to E-Sys's own start folder.
 pushd "%L%\environment"
-"%JAVA%" %HEAP% -cp "%CP%" CarBuilder "%CAR%" "%DATA%"
+rem English (US) locale whatever the Windows language: PSdZ's security init fails on a Turkish Windows (dotted/dotless i)
+rem and every build then stops with "Invalid call for decryptVerifyXML". E-Sys itself sets English from its language=en.
+rem Java on Windows takes the display language and the Region format separately, so both are set. CarBuilder sets it too.
+set "LOCALE=-Duser.language=en -Duser.country=US -Duser.script= -Duser.variant= -Duser.language.format=en -Duser.country.format=US -Duser.script.format= -Duser.variant.format= -Duser.language.display=en -Duser.country.display=US -Duser.script.display= -Duser.variant.display="
+"%JAVA%" %HEAP% %LOCALE% -cp "%CP%" CarBuilder "%CAR%" "%DATA%"
 set RC=%ERRORLEVEL%
 popd
 exit /b %RC%

@@ -13,6 +13,7 @@ static class Practice
     public const string CodingFailsKey = "CODING_FAILS";
     public const string DropKey = "DROP_DURING_CODING";
     public const string LowBatteryKey = "LOW_BATTERY";
+    public const string AliveCheckKey = "ALIVE_CHECK";
     public const int LowBatteryMv = 11400;
 
     public static Dictionary<string, string> Problems(string folder)
@@ -126,6 +127,7 @@ sealed class PracticeForm : Window
         rows.Controls.Add(ModuleProblem("Coding fails on a module", Practice.CodingFailsKey, modules));
         rows.Controls.Add(Switch("The connection drops during coding (once, at the third coding write)", Practice.DropKey));
         rows.Controls.Add(Switch($"Low battery ({Practice.LowBatteryMv / 1000.0:0.0} V)", Practice.LowBatteryKey));
+        rows.Controls.Add(Switch("A second program takes the car when the first does not answer the gateway's alive check", Practice.AliveCheckKey));
 
         rows.Controls.Add(Heading("Erase a module's coding data"));
         rows.Controls.Add(Note("E-Sys then shows CAFD_FFFFFFFF for that module, as after a flash or with a new module. To fix it in E-Sys, "

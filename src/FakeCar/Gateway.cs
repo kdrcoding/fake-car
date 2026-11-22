@@ -9,14 +9,16 @@ namespace FakeCar;
 /// The car's Ethernet gateway as an F10 ZGW shows it on the OBD cable: HSFZ on TCP 6801 (one tester at a time,
 /// a second one is reset), and the vehicle search on UDP 6811. <paramref name="testers"/> hears who connects (null = gone).
 /// </summary>
-sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, Action<IPEndPoint?>? testers = null)
+sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, Action<IPEndPoint?>? testers = null, int diagPort = 6801, int searchPort = 6811)
 {
-    const int DiagPort = 6801;
-    const int SearchPort = 6811;
+    // Real cars use 6801 and 6811; the tests pass other ports so they never meet a running Fake Car.
+    readonly int DiagPort = diagPort;
+    readonly int SearchPort = searchPort;
     const ushort ControlDiag = 0x0001;
     const ushort ControlAck = 0x0002;
     const ushort ControlIdent = 0x0011;
     const ushort ControlAlive = 0x0012;
+    const ushort ControlAliveAnswer = 0x0013;
     const byte Functional = 0xDF;
 
     readonly Lock busy = new();
@@ -44,6 +46,10 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, 
                 client.Close();
                 continue;
             }
+            TcpClient? first;
+            lock (busy) first = tester;
+            if (first is not null && car.AliveCheck)
+                await FirstStillThereAsync(first, stop);
             lock (busy)
             {
                 if (tester is not null)
@@ -60,8 +66,57 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, 
         }
     }
 
+    /// <summary>A connection's waiting alive check.</summary>
+    sealed class Session
+    {
+        public volatile TaskCompletionSource? Alive;
+    }
+
+    readonly Dictionary<TcpClient, Session> sessions = [];
+
+    /// <summary>
+    /// Practice "alive check" on: the gateway asks the connected tester (0012, no data) whether it is still there. It
+    /// keeps the car when it answers 0013 within a second; otherwise it is dropped and the new tester gets the car.
+    /// </summary>
+    async Task<bool> FirstStillThereAsync(TcpClient first, CancellationToken stop)
+    {
+        Session? session;
+        lock (busy) sessions.TryGetValue(first, out session);
+        if (session is null) return false;
+        var answered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        session.Alive = answered;
+        try
+        {
+            await WriteAsync(first.GetStream(), session, ControlAlive, [], stop);
+            log.Line($"alive check sent to {first.Client.RemoteEndPoint}");
+        }
+        catch (Exception e) when (e is IOException or ObjectDisposedException or SocketException or InvalidOperationException)
+        {
+            return false;
+        }
+        var done = await Task.WhenAny(answered.Task, Task.Delay(TimeSpan.FromSeconds(1), stop));
+        session.Alive = null;
+        if (done == answered.Task)
+        {
+            log.Line("   it answered: it keeps the car");
+            return true;
+        }
+        log.Line("   no answer in 1 s: it is dropped, the new tester gets the car");
+        first.Client.LingerState = new LingerOption(true, 0);
+        first.Close();
+        // ServeAsync ends on the closed connection and frees the car; wait a moment for that.
+        for (var i = 0; i < 50; i++)
+        {
+            lock (busy) if (tester != first) break;
+            await Task.Delay(20, stop);
+        }
+        return false;
+    }
+
     async Task ServeAsync(TcpClient client, CancellationToken stop)
     {
+        var session = new Session();
+        lock (busy) sessions[client] = session;
         var peer = client.Client.RemoteEndPoint;
         log.Line($"tester connected {peer}");
         testers?.Invoke(peer as IPEndPoint);
@@ -87,7 +142,11 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, 
                         await SendAsync(stream, ControlIdent, Identification(), stop);
                         break;
                     case ControlAlive:
-                        await SendAsync(stream, ControlAlive, [0x00, 0xF4], stop);
+                        await WriteAsync(stream, session, ControlAlive, [0x00, 0xF4], stop);
+                        break;
+                    case ControlAliveAnswer:
+                        // The answer to the gateway's alive check (FirstStillThereAsync).
+                        session.Alive?.TrySetResult();
                         break;
                     default:
                         log.Line($"  control {control:X4} body {Convert.ToHexString(body)}");
@@ -102,7 +161,11 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, 
         {
             log.Line($"tester gone {peer}");
             client.Close();
-            lock (busy) tester = null;
+            lock (busy)
+            {
+                sessions.Remove(client);
+                if (tester == client) tester = null;
+            }
             testers?.Invoke(null);
         }
     }
@@ -144,14 +207,29 @@ sealed class Gateway(Car car, Diagnostics diagnostics, Log log, IPAddress bind, 
         }
     }
 
+    /// <summary>One writer at a time per connection: the alive check goes out from the accept loop.</summary>
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Stream, SemaphoreSlim> Gates = new();
+
     static async Task SendAsync(Stream stream, ushort control, byte[] payload, CancellationToken stop)
     {
         var frame = new byte[6 + payload.Length];
         BinaryPrimitives.WriteInt32BigEndian(frame, payload.Length);
         BinaryPrimitives.WriteUInt16BigEndian(frame.AsSpan(4), control);
         payload.CopyTo(frame, 6);
-        await stream.WriteAsync(frame, stop);
+        var gate = Gates.GetValue(stream, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(stop);
+        try
+        {
+            await stream.WriteAsync(frame, stop);
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
+
+    static Task WriteAsync(Stream stream, Session session, ushort control, byte[] payload, CancellationToken stop) =>
+        SendAsync(stream, control, payload, stop);
 
     /// <summary>Other PCs off (Options): <see cref="bind"/> is 127.0.0.1, the car listens everywhere but serves this PC only.</summary>
     bool OnlyThisPc => IPAddress.IsLoopback(bind);

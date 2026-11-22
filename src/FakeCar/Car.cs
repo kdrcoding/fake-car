@@ -104,6 +104,11 @@ sealed class Car
     public HashSet<byte> CodingFails { get; } = [];
     /// <summary>The connection drops once, at the third coding write.</summary>
     public bool DropDuringCoding { get; private set; }
+    /// <summary>
+    /// A second tester gets the car the way a real gateway decides it: the gateway asks the first one (alive check,
+    /// control 0012) and keeps it only when it answers (0013) within a second. Off: a second tester is always reset.
+    /// </summary>
+    public bool AliveCheck { get; private set; }
 
     /// <summary>On: answer with car.txt VIN_ISTA (a "?" in place 9 becomes the check digit), when the car has one.</summary>
     public static bool UseIstaVin { get; set; }
@@ -132,6 +137,7 @@ sealed class Car
         car.Silent.UnionWith(Practice.Addresses(problems.GetValueOrDefault(Practice.SilentKey, "")));
         car.CodingFails.UnionWith(Practice.Addresses(problems.GetValueOrDefault(Practice.CodingFailsKey, "")));
         car.DropDuringCoding = problems.GetValueOrDefault(Practice.DropKey) == "1";
+        car.AliveCheck = problems.GetValueOrDefault(Practice.AliveCheckKey) == "1";
 
         foreach (var line in File.ReadAllLines(Path.Combine(folder, "modules.txt")))
         {

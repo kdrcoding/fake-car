@@ -223,6 +223,7 @@ sealed class PickerForm : Window
     {
         if (runningModel != m) return;
         testerAt = peer is null ? null : IPAddress.IsLoopback(peer.Address) ? "this PC" : peer.Address.ToString();
+        if (testerAt is not null) cutTester = null;
         ShowState();
         if (testerAt is not null && Options.Notify && DateTime.UtcNow - toldConnect > TimeSpan.FromMinutes(1))
         {
@@ -503,9 +504,17 @@ sealed class PickerForm : Window
         return built;
     }
 
+    /// <summary>
+    /// The car a connected tester lost when it was stopped, switched or started again (null when none). E-Sys does not
+    /// notice: it still counts itself connected and its next job fails with "dispatchEOF called" [C005] (customer
+    /// 2026-11-24, Read FA after switching to the MINI). The status line says so until a tester connects again.
+    /// </summary>
+    string? cutTester;
+
     async Task StopCar()
     {
         if (running is null || task is null) return;
+        if (testerAt is not null && runningModel is not null) cutTester = runningModel.Name;
         running.Cancel();
         await Task.WhenAny(task, Task.Delay(3000));
         running.Dispose();
@@ -524,13 +533,15 @@ sealed class PickerForm : Window
         if (runningModel is null)
         {
             start.Text = "Start";
-            if (Selected is not null) status.Text = "Not running.";
+            if (Selected is not null) status.Text = cutTester is null ? "Not running." : $"Not running. E-Sys was connected to the {cutTester}: after you start a car, in E-Sys Close Connection and open it again.";
             return;
         }
         start.Text = Selected == runningModel ? "Stop" : "Switch";
         status.Text = testerAt is not null
             ? $"Running: {runningModel.Name}. A tester is connected from {testerAt}."
-            : $"Running: {runningModel.Name}. In E-Sys, Open Connection and {runningModel.Connect}.";
+            : cutTester is not null
+                ? $"Running: {runningModel.Name}. E-Sys was connected to the {cutTester} and lost it when that car stopped: in E-Sys, Close Connection, then Open Connection and {runningModel.Connect}."
+                : $"Running: {runningModel.Name}. In E-Sys, Open Connection and {runningModel.Connect}.";
     }
 
     /// <summary>The icon's hover text: what runs now.</summary>

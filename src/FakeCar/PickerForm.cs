@@ -443,9 +443,10 @@ sealed class PickerForm : Window
     readonly Label buildTitle = new() { Dock = DockStyle.Top, Height = 30, Font = new Font("Segoe UI Semibold", 11f), AutoEllipsis = true };
     readonly Bar buildBar = new() { Dock = DockStyle.Top, Height = 6, Maximum = 1000 };
     readonly Label buildStep = new() { Dock = DockStyle.Top, Height = 44, Padding = new Padding(0, 8, 0, 0), AutoEllipsis = true };
-    readonly Label buildNote = new() { Dock = DockStyle.Top, Height = 40, ForeColor = SystemColors.GrayText, Text = "This happens once per car. E-Sys can stay open." };
+    readonly Label buildNote = new() { Dock = DockStyle.Top, Height = 40, ForeColor = SystemColors.GrayText, Text = "First-time PSdZ startup can take several minutes. E-Sys can stay open." };
     readonly System.Windows.Forms.Timer buildTimer = new() { Interval = 150 };
-    double shownPercent, reportedPercent;
+    int reportedPercent;
+    DateTime buildStartedAt;
     string buildWhat = "";
 
     void SetUpBuildScreen(Control listHolder)
@@ -453,15 +454,21 @@ sealed class PickerForm : Window
         buildScreen.Controls.AddRange([buildNote, buildStep, buildBar, buildTitle]);
         listHolder.Controls.Add(buildScreen);
         buildScreen.BringToFront();
-        // Between the builder's steps the bar keeps creeping towards the next one (never reaching it), so a slow step
-        // (PSdZ starting can take a minute the first time) never looks frozen.
         buildTimer.Tick += (_, _) =>
         {
-            var next = reportedPercent < 3 ? 3 : reportedPercent < 8 ? 8 : reportedPercent < 15 ? 15 : reportedPercent < 50 ? 50 : reportedPercent < 60 ? 60 : Math.Min(100, reportedPercent + 3);
-            if (shownPercent < reportedPercent) shownPercent = reportedPercent;
-            else if (shownPercent < next - 0.5) shownPercent += Math.Max(0.02, (next - 0.5 - shownPercent) * 0.012);
-            buildBar.Value = (int)Math.Clamp(shownPercent * 10, 0, 1000);
-            buildStep.Text = $"{buildWhat}   {(int)shownPercent}%";
+            var percent = Math.Clamp(reportedPercent, 0, 100);
+            buildBar.Value = percent * 10;
+            var elapsed = DateTime.UtcNow - buildStartedAt;
+            var elapsedText = elapsed.TotalHours >= 1
+                ? $"{(int)elapsed.TotalHours}:{elapsed.ToString(@"mm\:ss")}"
+                : elapsed.ToString(@"m\:ss");
+            buildStep.Text = $"{buildWhat}   {percent}%";
+            var waitHint = buildWhat.Contains("module", StringComparison.OrdinalIgnoreCase)
+                ? "Cars with more modules can take longer to check."
+                : buildWhat.Contains("PSdZ", StringComparison.OrdinalIgnoreCase)
+                    ? "First-time PSdZ startup can take several minutes."
+                    : "E-Sys can stay open.";
+            buildNote.Text = $"Elapsed: {elapsedText}. {waitHint}";
         };
     }
 
@@ -472,9 +479,10 @@ sealed class PickerForm : Window
         start.Enabled = false;
         list.Enabled = false;
         addCar.Enabled = practice.Enabled = options.Enabled = false;
-        status.Text = $"Building {m.Name} from your PSdZData. This takes a minute or two, once.";
+        status.Text = $"Building {m.Name} from your PSdZData. This is done once.";
         buildTitle.Text = "Building " + m.Name;
-        shownPercent = reportedPercent = 0;
+        reportedPercent = 0;
+        buildStartedAt = DateTime.UtcNow;
         buildWhat = "Starting the builder";
         buildScreen.Visible = true;
         list.Visible = false;

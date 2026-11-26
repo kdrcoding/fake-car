@@ -1,5 +1,7 @@
 # Fake Car
 
+> **This project is finished and gets no more updates.** Version 1.7.2 is the last one; every release stays here to download. The practice car lives on as MAX Practice inside [E-Sys MAX](https://esysmax.com).
+
 **A pretend BMW for E-Sys.** Start it on your PC, and E-Sys finds it and works with it like a real car: read and write the vehicle order, code modules, flash software, enter FSC codes, read faults. Then break it on purpose and practise fixing it.
 
 Use it to learn E-Sys, try a coding tool before it touches a real car, or record a video without a car and without showing a real VIN.
